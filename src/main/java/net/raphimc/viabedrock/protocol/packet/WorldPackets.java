@@ -165,8 +165,8 @@ public final class WorldPackets {
             wrapper.write(Types.VAR_INT, dimension.ordinal()); // dimension id
             wrapper.write(Types.STRING, dimension.getKey()); // dimension name
             wrapper.write(Types.LONG, 0L); // hashed seed
-            wrapper.write(Types.BYTE, (byte) clientPlayer.javaGameMode().ordinal()); // game mode
-            wrapper.write(Types.BYTE, (byte) -1); // previous game mode
+            wrapper.write(Types.VAR_INT, clientPlayer.javaGameMode().ordinal()); // game mode
+            wrapper.write(Types.OPTIONAL_VAR_INT, null); // previous game mode
             wrapper.write(Types.BOOLEAN, false); // is debug
             wrapper.write(Types.BOOLEAN, gameSession.isFlatGenerator()); // is flat
             wrapper.write(Types.OPTIONAL_GLOBAL_POSITION, null); // last death position
