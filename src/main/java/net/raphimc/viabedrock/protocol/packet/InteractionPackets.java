@@ -52,6 +52,7 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
@@ -312,38 +313,28 @@ public final class InteractionPackets {
                 return;
             }
 
-            final Entity passenger = entityTracker.getEntityByUid(linkType.toEntityUniqueId());
-            if (passenger == null) {
-                wrapper.cancel();
-                return;
-            }
-
             // TODO: Handle Passenger type if needed
             switch (linkType.type()) {
                 case Riding, Passenger -> { // TODO: This needs to be ordered properly based on the link types (rider first, then passengers)
-                    vehicle.addPassenger(passenger.uniqueId());
-
-                    wrapper.write(Types.VAR_INT, entityTracker.getEntityByUid(linkType.fromEntityUniqueId()).javaId()); // vehicle
-                    wrapper.write(Types.VAR_INT, vehicle.passengers().size()); // number of passengers
-                    for (long passengerUid : vehicle.passengers()) {
-                        wrapper.write(Types.VAR_INT, entityTracker.getEntityByUid(passengerUid).javaId()); // passenger id
+                    if (entityTracker.getEntityByUid(linkType.toEntityUniqueId()) == null) {
+                        wrapper.cancel();
+                        return;
                     }
+                    vehicle.addPassenger(linkType.toEntityUniqueId());
 
-                    if (passenger.uniqueId() == entityTracker.getClientPlayer().uniqueId()) { // TODO: This could be applied to all passengers not just players
+                    writeJavaPassengers(wrapper, entityTracker, vehicle);
+
+                    if (linkType.toEntityUniqueId() == entityTracker.getClientPlayer().uniqueId()) { // TODO: This could be applied to all passengers not just players
                         // The player is now riding an entity, update the state
-                        entityTracker.getClientPlayer().setMountEntityRuntimeId(entityTracker.getEntityByUid(linkType.fromEntityUniqueId()).runtimeId());
+                        entityTracker.getClientPlayer().setMountEntityRuntimeId(vehicle.runtimeId());
                     }
                 }
                 case None -> { // Remove
-                    vehicle.removePassenger(passenger.uniqueId());
+                    vehicle.removePassenger(linkType.toEntityUniqueId());
 
-                    wrapper.write(Types.VAR_INT, vehicle.javaId()); // vehicle
-                    wrapper.write(Types.VAR_INT, vehicle.passengers().size()); // number of passengers
-                    for (long passengerUid : vehicle.passengers()) {
-                        wrapper.write(Types.VAR_INT, entityTracker.getEntityByUid(passengerUid).javaId()); // passenger id
-                    }
+                    writeJavaPassengers(wrapper, entityTracker, vehicle);
 
-                    if (passenger.uniqueId() == entityTracker.getClientPlayer().uniqueId()) { // TODO: This could be applied to all passengers not just players
+                    if (linkType.toEntityUniqueId() == entityTracker.getClientPlayer().uniqueId()) { // TODO: This could be applied to all passengers not just players
                         // The player is no longer riding an entity, update the state
                         entityTracker.getClientPlayer().setMountEntityRuntimeId(-1);
                         entityTracker.getClientPlayer().setRequestedDismount(false);
@@ -352,6 +343,22 @@ public final class InteractionPackets {
             }
         });
 
+    }
+
+    private static void writeJavaPassengers(final PacketWrapper wrapper, final EntityTracker entityTracker, final Entity vehicle) {
+        final List<Entity> passengers = new ArrayList<>();
+        for (long passengerUid : vehicle.passengers()) {
+            final Entity passenger = entityTracker.getEntityByUid(passengerUid);
+            if (passenger != null) {
+                passengers.add(passenger);
+            }
+        }
+
+        wrapper.write(Types.VAR_INT, vehicle.javaId()); // vehicle
+        wrapper.write(Types.VAR_INT, passengers.size()); // number of tracked passengers
+        for (Entity passenger : passengers) {
+            wrapper.write(Types.VAR_INT, passenger.javaId()); // passenger id
+        }
     }
 
     private InteractionPackets() {
