@@ -236,11 +236,11 @@ public final class InventoryRequestPackets {
                         default -> {
                             ViaBedrock.getPlatform().getLogger().warning("Received unsupported recipe type: " + recipeType);
                             wrapper.clearPacket();
-                        return;
+                            return;
                         }
                     }
                 }
-            } catch (Exception exception) {
+            } catch (final Exception exception) {
                 // Recipes are optional during joining. Never publish a partially decoded list.
                 // The rest of this packet cannot be decoded safely after losing its field alignment.
                 wrapper.clearPacket();
