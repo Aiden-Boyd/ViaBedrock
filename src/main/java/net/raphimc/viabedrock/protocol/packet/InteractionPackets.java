@@ -313,6 +313,10 @@ public final class InteractionPackets {
             }
 
             final Entity passenger = entityTracker.getEntityByUid(linkType.toEntityUniqueId());
+            if (passenger == null) {
+                wrapper.cancel();
+                return;
+            }
 
             // TODO: Handle Passenger type if needed
             switch (linkType.type()) {
