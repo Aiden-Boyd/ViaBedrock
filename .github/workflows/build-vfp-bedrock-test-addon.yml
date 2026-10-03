@@ -1,0 +1,85 @@
+name: Build ViaFabricPlus Bedrock Test Addon
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - integration/inventory-current
+
+jobs:
+  build-test-addon:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ViaBedrock branch
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Publish this ViaBedrock build to Maven Local
+        run: ./gradlew clean publishToMavenLocal
+
+      - name: Clone ViaFabricPlus Bedrock
+        run: git clone --depth 1 https://github.com/ViaVersionAddons/viafabricplus-bedrock.git ../viafabricplus-bedrock
+
+      - name: Patch addon for current ViaBedrock API and Maven Local
+        working-directory: ../viafabricplus-bedrock
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          settings = Path("settings.gradle.kts")
+          text = settings.read_text()
+          marker = "dependencyResolutionManagement {\n    repositories {"
+          if marker not in text:
+              raise SystemExit("dependencyResolutionManagement repositories block not found")
+          text = text.replace(marker, marker + "\n        mavenLocal()", 1)
+          settings.write_text(text)
+
+          for path in Path("src/main/java").rglob("*.java"):
+              source = path.read_text()
+              updated = source.replace(
+                  "BedrockProtocolVersion.bedrockLatest",
+                  "BedrockProtocolVersion.BEDROCK_LATEST",
+              )
+              if updated != source:
+                  path.write_text(updated)
+
+          config = Path("src/main/java/com/viaversion/viafabricplus/bedrock/protocoltranslator/platform/ViaFabricPlusViaBedrockConfig.java")
+          source = config.read_text()
+          source = source.replace("import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;\n", "")
+          old = """    @Override
+              public boolean shouldEnableExperimentalFeatures() {
+                  // Moved into the settings GUI, which also changes the default to true
+                  return ViaFabricPlusBedrock.impl().settings().experimentalFeatures().isActive();
+              }
+
+          """
+          if old not in source:
+              raise SystemExit("Expected experimental-features override not found")
+          config.write_text(source.replace(old, ""))
+          PY
+
+      - name: Build addon
+        working-directory: ../viafabricplus-bedrock
+        run: ./gradlew clean build --refresh-dependencies
+
+      - name: Verify embedded ViaBedrock is this build
+        run: |
+          LOCAL_JAR="$HOME/.m2/repository/net/raphimc/ViaBedrock/0.0.31-SNAPSHOT/ViaBedrock-0.0.31-SNAPSHOT.jar"
+          STAGED_JAR="../viafabricplus-bedrock/build/processIncludeJars/ViaBedrock-0.0.31-SNAPSHOT.jar"
+          sha256sum "$LOCAL_JAR" "$STAGED_JAR"
+          test "$(sha256sum "$LOCAL_JAR" | cut -d' ' -f1)" = "$(sha256sum "$STAGED_JAR" | cut -d' ' -f1)"
+
+      - name: Upload test addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: viafabricplus-bedrock-custom-test
+          path: ../viafabricplus-bedrock/build/libs/viafabricplus-bedrock-1.1.1-SNAPSHOT.jar
+          if-no-files-found: error
