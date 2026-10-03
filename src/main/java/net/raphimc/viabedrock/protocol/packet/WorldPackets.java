@@ -441,7 +441,7 @@ public final class WorldPackets {
             for (Map.Entry<BlockPosition, List<BlockChangeRecord>> entry : blockChanges.entrySet()) {
                 final BlockPosition chunkPosition = entry.getKey();
                 final List<BlockChangeRecord> changes = entry.getValue();
-                final long chunkKey = (chunkPosition.x() & 0x3FFFFFL) << 42 | (chunkPosition.z() & 0x3FFFFFL) << 20 | (chunkPosition.y() & 0xFFFL);
+                final long chunkKey = packSectionPosition(chunkPosition);
 
                 final PacketWrapper multiBlockChange = wrapper.create(ClientboundPackets26_3.SECTION_BLOCKS_UPDATE);
                 multiBlockChange.write(Types.LONG, chunkKey); // chunk position
@@ -551,6 +551,10 @@ public final class WorldPackets {
             wrapper.write(BedrockTypes.BLOCK_POSITION, position); // position
             wrapper.write(BedrockTypes.NETWORK_TAG, signTag.copy()); // block entity tag
         });
+    }
+
+    static long packSectionPosition(final BlockPosition section) {
+        return (section.x() & 0x3FFFFFL) << 42 | (section.z() & 0x3FFFFFL) << 20 | (section.y() & 0xFFFFFL);
     }
 
     private WorldPackets() {
