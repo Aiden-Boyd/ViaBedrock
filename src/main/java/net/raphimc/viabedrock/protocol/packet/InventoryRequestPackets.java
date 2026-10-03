@@ -260,7 +260,12 @@ public final class InventoryRequestPackets {
                 inventoryRequestTracker.removeRequest(info.requestId());
 
                 if (info.result() != ItemStackNetResult.Success) {
-                    ViaBedrock.getPlatform().getLogger().warning("Received unsuccessful item stack response: " + info.result());
+                    ViaBedrock.getPlatform().getLogger().warning(
+                            "Received unsuccessful item stack response: result=" + info.result()
+                                    + ", requestId=" + info.requestId()
+                                    + ", javaRevision=" + requestInfo.javaRevision()
+                                    + ", actions=" + requestInfo.requestInfo().actions()
+                    );
                     inventoryTracker.getHudContainer().setItems(requestInfo.prevCursorContainer().getItems().clone());
                     for (Container container : requestInfo.prevContainers()) {
                         final Container newContainer = inventoryTracker.getContainerClientbound(container.containerId(), null, null);
