@@ -47,7 +47,10 @@ import net.raphimc.viabedrock.protocol.data.enums.java.*;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.*;
 import net.raphimc.viabedrock.protocol.model.Position2f;
 import net.raphimc.viabedrock.protocol.model.Position3f;
+import net.raphimc.viabedrock.protocol.model.inventory.BedrockInventoryTransaction;
+import net.raphimc.viabedrock.protocol.model.inventory.InventoryTransactionData;
 import net.raphimc.viabedrock.protocol.rewriter.GameTypeRewriter;
+import net.raphimc.viabedrock.protocol.rewriter.InventoryTransactionRewriter;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.*;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
@@ -354,7 +357,34 @@ public final class ClientPlayerPackets {
                     } else {
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.ContinueDestroyBlock, position, direction.ordinal()));
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.PredictDestroyBlock, position, direction.ordinal()));
-                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, position, 0));
+                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, position, direction.ordinal()));
+                    }
+
+                    if (clientPlayer.javaGameMode() != GameMode.CREATIVE) {
+                        final InventoryContainer inventoryContainer = wrapper.user().get(InventoryTracker.class).getInventoryContainer();
+                        final BedrockInventoryTransaction transaction = new BedrockInventoryTransaction(
+                            0,
+                            null,
+                            null,
+                            ComplexInventoryTransaction_Type.ItemUseTransaction,
+                            new InventoryTransactionData.UseItemTransactionData(
+                                ItemUseActionType.Destroy,
+                                ItemUseTriggerType.Player_Input,
+                                position,
+                                direction.ordinal(),
+                                inventoryContainer.getSelectedHotbarSlot(),
+                                HandSlot.Mainhand,
+                                inventoryContainer.getSelectedHotbarItem(),
+                                clientPlayer.position(),
+                                Position3f.ZERO,
+                                chunkTracker.getBlockState(position),
+                                ItemUsePredictedResult.Success,
+                                ItemUseClientCooldownState.Off
+                            )
+                        );
+                        final PacketWrapper transactionPacket = PacketWrapper.create(ServerboundBedrockPackets.INVENTORY_TRANSACTION, wrapper.user());
+                        transactionPacket.write(wrapper.user().get(InventoryTransactionRewriter.class).getInventoryTransactionType(), transaction);
+                        transactionPacket.sendToServer(BedrockProtocol.class);
                     }
 
                     chunkTracker.handleBlockChange(position, 0, chunkTracker.bedrockAirId());
