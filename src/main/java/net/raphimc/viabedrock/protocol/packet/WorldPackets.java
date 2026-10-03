@@ -165,8 +165,8 @@ public final class WorldPackets {
             wrapper.write(Types.VAR_INT, dimension.ordinal()); // dimension id
             wrapper.write(Types.STRING, dimension.getKey()); // dimension name
             wrapper.write(Types.LONG, 0L); // hashed seed
-            wrapper.write(Types.BYTE, (byte) clientPlayer.javaGameMode().ordinal()); // game mode
-            wrapper.write(Types.BYTE, (byte) -1); // previous game mode
+            wrapper.write(Types.VAR_INT, clientPlayer.javaGameMode().ordinal()); // game mode
+            wrapper.write(Types.OPTIONAL_VAR_INT, null); // previous game mode
             wrapper.write(Types.BOOLEAN, false); // is debug
             wrapper.write(Types.BOOLEAN, gameSession.isFlatGenerator()); // is flat
             wrapper.write(Types.OPTIONAL_GLOBAL_POSITION, null); // last death position
@@ -277,8 +277,8 @@ public final class WorldPackets {
                         ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Error reading chunk data", e);
                     }
 
-                    // Send the available terrain without waiting for requested subchunks. Their
-                    // responses queue further chunk packets as the terrain fills in.
+                    // Requested subchunks may still be missing; the tracker queues the Java chunk
+                    // only after all required Bedrock sections have arrived.
                     chunkTracker.sendChunkInNextTick(chunkX, chunkZ);
                 } catch (final Throwable e) {
                     throw new RuntimeException("Error handling chunk data", e);
@@ -441,7 +441,7 @@ public final class WorldPackets {
             for (Map.Entry<BlockPosition, List<BlockChangeRecord>> entry : blockChanges.entrySet()) {
                 final BlockPosition chunkPosition = entry.getKey();
                 final List<BlockChangeRecord> changes = entry.getValue();
-                final long chunkKey = (chunkPosition.x() & 0x3FFFFFL) << 42 | (chunkPosition.z() & 0x3FFFFFL) << 20 | (chunkPosition.y() & 0xFFFL);
+                final long chunkKey = packSectionPosition(chunkPosition);
 
                 final PacketWrapper multiBlockChange = wrapper.create(ClientboundPackets26_3.SECTION_BLOCKS_UPDATE);
                 multiBlockChange.write(Types.LONG, chunkKey); // chunk position
@@ -551,6 +551,10 @@ public final class WorldPackets {
             wrapper.write(BedrockTypes.BLOCK_POSITION, position); // position
             wrapper.write(BedrockTypes.NETWORK_TAG, signTag.copy()); // block entity tag
         });
+    }
+
+    static long packSectionPosition(final BlockPosition section) {
+        return (section.x() & 0x3FFFFFL) << 42 | (section.z() & 0x3FFFFFL) << 20 | (section.y() & 0xFFFFFL);
     }
 
     private WorldPackets() {
