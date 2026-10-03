@@ -254,41 +254,47 @@ public abstract class Container {
             return null;
         }
 
-        final Container container = clickContext.container;
-        if (javaSlot < 0 || javaSlot >= container.getItems().length) {
-            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle swap for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
+        final SlotRef source = this.resolveJavaSlot(clickContext, javaSlot);
+        if (source == null) {
+            return null;
+        }
+        final Container container = source.container();
+        final int bedrockSlot = source.bedrockSlot();
+        final Container hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
+        if (container instanceof InventoryContainer && bedrockSlot == button) {
             return null;
         }
 
-        final Container hotbarContainer = clickContext.inventoryTracker.getInventoryContainer();
+        clickContext.prevContainers.add(container.copy());
+        clickContext.prevContainers.add(hotbarContainer.copy());
 
-        final BedrockItem item = container.getItem(clickContext.bedrockSlot).copy();
+        final BedrockItem item = container.getItem(bedrockSlot).copy();
         final BedrockItem hotbarItem = hotbarContainer.getItem(button).copy();
 
         if (item.isEmpty() && hotbarItem.isEmpty()) {
             return null;
         }
 
-        container.setItem(clickContext.bedrockSlot, hotbarItem);
+        container.setItem(bedrockSlot, hotbarItem);
         hotbarContainer.setItem(button, item);
 
         if (hotbarItem.isEmpty()) {
             return new ItemStackRequestAction.PlaceAction(
                     item.amount(),
-                    new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId()),
+                    new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId()),
                     new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, 0)
             );
         } else if (item.isEmpty()) {
             return new ItemStackRequestAction.PlaceAction(
                     hotbarItem.amount(),
                     new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, hotbarItem.netId()),
-                    new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, 0)
+                    new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, 0)
             );
         }
 
         return new ItemStackRequestAction.SwapAction(
                 new ItemStackRequestSlotInfo(hotbarContainer.getFullContainerName(button), button, hotbarItem.netId()),
-                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId())
+                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId())
         );
     }
 
@@ -368,13 +374,15 @@ public abstract class Container {
             return this.dropCursorItem(clickContext.inventoryTracker, button);
         }
 
-        final Container container = clickContext.container;
-        if (javaSlot < 0 || javaSlot >= container.getItems().length) {
-            ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to handle throw for " + container.type() + ", but slot was out of bounds (" + javaSlot + ")");
+        final SlotRef source = this.resolveJavaSlot(clickContext, javaSlot);
+        if (source == null) {
             return null;
         }
+        final Container container = source.container();
+        final int bedrockSlot = source.bedrockSlot();
+        clickContext.prevContainers.add(container.copy());
 
-        final BedrockItem item = container.getItem(clickContext.bedrockSlot);
+        final BedrockItem item = container.getItem(bedrockSlot);
 
         if (item.isEmpty()) {
             return null;
@@ -383,11 +391,11 @@ public abstract class Container {
         final int amountToDrop = button == 0 ? 1 : item.amount();
 
         final BedrockItem finalContainerItem = this.itemAfterRemovingAmount(item, amountToDrop);
-        container.setItem(clickContext.bedrockSlot, finalContainerItem);
+        container.setItem(bedrockSlot, finalContainerItem);
 
         return new ItemStackRequestAction.DropAction(
                 amountToDrop,
-                new ItemStackRequestSlotInfo(container.getFullContainerName(clickContext.bedrockSlot), (byte) clickContext.bedrockSlot, item.netId()),
+                new ItemStackRequestSlotInfo(container.getFullContainerName(bedrockSlot), (byte) bedrockSlot, item.netId()),
                 false
         );
     }
@@ -552,6 +560,9 @@ public abstract class Container {
             }
         }
 
+        if (bedrockSlot < 0 || bedrockSlot >= container.size()) {
+            return null;
+        }
         return new SlotRef(container, bedrockSlot);
     }
 
