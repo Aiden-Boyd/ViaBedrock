@@ -325,13 +325,19 @@ public final class ClientPlayerPackets {
                 case START_DESTROY_BLOCK -> {
                     clientPlayer.sendSwingPacketToServer();
                     clientPlayer.cancelNextSwingPacket();
-                    clientPlayer.setBlockBreakingInfo(new ClientPlayerEntity.BlockBreakingInfo(position, direction));
-                    // TODO: Handle instant breaking
-                    // TODO: Handle creative mode mining
-                    // TODO: Test breaking fire
-                    // TODO: The java client keeps spamming swing packets while waiting for the block break cooldown. Those need to be cancelled
 
-                    clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StartDestroyBlock, position, direction.ordinal()));
+                    if (clientPlayer.javaGameMode() == GameMode.CREATIVE) {
+                        clientPlayer.setBlockBreakingInfo(null);
+                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CreativeDestroyBlock, position, direction.ordinal()));
+                        chunkTracker.handleBlockChange(position, 0, chunkTracker.bedrockAirId());
+                        PacketFactory.sendJavaBlockUpdate(wrapper.user(), position, ProtocolConstants.JAVA_AIR_ID);
+                    } else {
+                        clientPlayer.setBlockBreakingInfo(new ClientPlayerEntity.BlockBreakingInfo(position, direction));
+                        // TODO: Handle instant breaking
+                        // TODO: Test breaking fire
+                        // TODO: The java client keeps spamming swing packets while waiting for the block break cooldown. Those need to be cancelled
+                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StartDestroyBlock, position, direction.ordinal()));
+                    }
                 }
                 case CHANGE_DESTROY_DIRECTION -> {
                     final ClientPlayerEntity.BlockBreakingInfo blockBreakingInfo = clientPlayer.blockBreakingInfo();
@@ -350,6 +356,10 @@ public final class ClientPlayerPackets {
                     clientPlayer.cancelNextSwingPacket();
                     clientPlayer.setBlockBreakingInfo(null);
 
+                    if (clientPlayer.javaGameMode() == GameMode.CREATIVE) {
+                        break;
+                    }
+
                     if (!gameSession.isBlockBreakingServerAuthoritative()) {
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock));
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CrackBlock, position, direction.ordinal()));
@@ -360,7 +370,7 @@ public final class ClientPlayerPackets {
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, position, direction.ordinal()));
                     }
 
-                    if (clientPlayer.javaGameMode() != GameMode.CREATIVE) {
+                    {
                         final InventoryContainer inventoryContainer = wrapper.user().get(InventoryTracker.class).getInventoryContainer();
                         final BedrockInventoryTransaction transaction = new BedrockInventoryTransaction(
                             0,
