@@ -444,7 +444,8 @@ public class BedrockMappingData extends MappingDataBase {
                 for (JsonElement itemIdentifierJson : entry.getValue().getAsJsonArray()) {
                     final String bedrockIdentifier = itemIdentifierJson.getAsString();
                     if (!bedrockItems.contains(bedrockIdentifier)) {
-                        throw new RuntimeException("Unknown bedrock item: " + bedrockIdentifier);
+                        this.getLogger().warning("Skipping tag " + tagName + " for unknown bedrock item: " + bedrockIdentifier);
+                        continue;
                     }
                     if (!this.bedrockItemTags.containsKey(bedrockIdentifier)) {
                         this.bedrockItemTags.put(bedrockIdentifier, new HashSet<>());
@@ -462,7 +463,8 @@ public class BedrockMappingData extends MappingDataBase {
                 for (JsonElement itemIdentifierJson : entry.getValue().getAsJsonArray()) {
                     final String bedrockIdentifier = itemIdentifierJson.getAsString();
                     if (!bedrockItems.contains(bedrockIdentifier)) {
-                        throw new RuntimeException("Unknown bedrock item: " + bedrockIdentifier);
+                        this.getLogger().warning("Skipping custom tag " + tagName + " for unknown bedrock item: " + bedrockIdentifier);
+                        continue;
                     }
                     if (this.bedrockCustomItemTags.put(bedrockIdentifier, tagName) != null) {
                         throw new RuntimeException("Duplicate bedrock custom item tag for " + bedrockIdentifier);
@@ -476,7 +478,8 @@ public class BedrockMappingData extends MappingDataBase {
             for (Map.Entry<String, JsonElement> entry : bedrockToJavaItemMappingsJson.entrySet()) {
                 final String bedrockIdentifier = entry.getKey();
                 if (!bedrockItems.contains(bedrockIdentifier)) {
-                    throw new RuntimeException("Unknown bedrock item: " + bedrockIdentifier);
+                    this.getLogger().warning("Skipping mapping for unknown bedrock item: " + bedrockIdentifier);
+                    continue;
                 }
                 final JsonObject definition = entry.getValue().getAsJsonObject();
                 if (definition.has("block")) {
