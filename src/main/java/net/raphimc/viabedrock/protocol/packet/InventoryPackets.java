@@ -606,7 +606,12 @@ public final class InventoryPackets {
     public static String containerTitleKey(final ContainerType type, final String blockTag, final boolean doubleChest) {
         return switch (type) {
             case WORKBENCH -> "container.crafting";
-            case CONTAINER -> doubleChest ? "container.chestDouble" : "container.chest";
+            case CONTAINER -> doubleChest ? "container.chestDouble" : switch (blockTag) {
+                case "barrel" -> "container.barrel";
+                case "ender_chest" -> "container.enderchest";
+                case "shulker_box", "undyed_shulker_box" -> "container.shulkerBox";
+                default -> "container.chest";
+            };
             case ENCHANTMENT -> "container.enchant";
             case ANVIL -> "container.repair";
             case STONECUTTER -> "container.stonecutter";

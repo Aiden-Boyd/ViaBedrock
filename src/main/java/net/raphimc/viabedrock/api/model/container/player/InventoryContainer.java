@@ -61,7 +61,8 @@ public class InventoryContainer extends Container {
                     && (button == 0 || button == 1) && hud.craft(revision, action == ContainerInput.QUICK_MOVE);
         }
         final boolean handled = super.handleClick(revision, slot, button, action);
-        if ((slot >= 1 && slot <= 4 || action == ContainerInput.PICKUP_ALL)
+        if ((slot >= 1 && slot <= 4 || action == ContainerInput.PICKUP_ALL
+                || action == ContainerInput.QUICK_CRAFT && (button & 3) == 2)
                 && (action != ContainerInput.QUICK_CRAFT || (button & 3) == 2)) {
             hud.updateCraftingResult();
             hud.sendCraftingResult();
