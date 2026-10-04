@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.network.chat.Component;
@@ -48,6 +49,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmokeAccess {
 
     @Shadow protected ServerSelectionList serverSelectionList;
+    @Shadow private Button joinButton;
+    @Shadow private Button editButton;
+    @Shadow private Button deleteButton;
     @Unique private final AccountWorldList<FriendWorld> viaBedrock$friends = new AccountWorldList<>();
 
     @Inject(method = "tick", at = @At("TAIL"))
@@ -68,9 +72,23 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
         this.viaBedrock$updateList();
     }
 
+    @Inject(method = "onSelectedChange", at = @At("TAIL"))
+    private void useBedrockFriendButtons(final CallbackInfo ci) {
+        if (this.serverSelectionList.getSelected() instanceof BedrockFriendEntry) {
+            this.joinButton.active = true;
+            this.editButton.active = false;
+            this.deleteButton.active = false;
+        }
+    }
+
     @Override
     public boolean viaBedrock$hasMenuRows() {
-        return this.serverSelectionList.children().stream().anyMatch(BedrockFriendEntry.class::isInstance);
+        final var row = this.serverSelectionList.children().stream().filter(BedrockFriendEntry.class::isInstance).findFirst();
+        if (row.isEmpty()) {
+            return false;
+        }
+        this.serverSelectionList.setSelected(row.get());
+        return this.joinButton.active && !this.editButton.active && !this.deleteButton.active;
     }
 
     @Unique

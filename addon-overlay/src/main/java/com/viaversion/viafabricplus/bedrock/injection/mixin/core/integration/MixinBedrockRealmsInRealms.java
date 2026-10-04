@@ -75,7 +75,12 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, Be
 
     @Override
     public boolean viaBedrock$hasMenuRows() {
-        return this.realmSelectionList.children().stream().anyMatch(BedrockRealmEntry.class::isInstance);
+        final var row = this.realmSelectionList.children().stream().filter(BedrockRealmEntry.class::isInstance).findFirst();
+        if (row.isEmpty()) {
+            return false;
+        }
+        this.realmSelectionList.setSelected(row.get());
+        return this.playButton.active && !this.configureButton.active && !this.renewButton.active && !this.leaveButton.active;
     }
 
     @Override
