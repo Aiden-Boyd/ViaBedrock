@@ -45,8 +45,8 @@ final class PlayerAuthInputBlockActionsTest {
             Types.VAR_INT.read(buffer); // packet id
             final byte[] payload = new byte[buffer.readableBytes()];
             buffer.readBytes(payload);
-            // Signed count=2, stop=2 without payload, start=0, x=1, unsigned y=2, z=3, face=5.
-            assertArrayEquals(new byte[]{4, 4, 0, 2, 2, 6, 10}, payload);
+            // Signed count=2, stop=2 without payload, start=0, x=1, signed y=2, z=3, face=5.
+            assertArrayEquals(new byte[]{4, 4, 0, 2, 4, 6, 10}, payload);
         } finally {
             buffer.release();
         }
