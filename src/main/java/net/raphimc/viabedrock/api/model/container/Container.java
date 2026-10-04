@@ -42,6 +42,13 @@ import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.Objects;
+import net.raphimc.viabedrock.api.util.PacketFactory;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -54,6 +61,9 @@ public abstract class Container {
     protected final BlockPosition position;
     protected final BedrockItem[] items;
     protected final Set<String> validBlockTags;
+    private final Set<Short> dragSlots = new LinkedHashSet<>();
+    private BedrockItem dragCursor;
+    private int dragMode = -1;
 
     public Container(final UserConnection user, final byte containerId, final ContainerType type, final TextComponent title, final BlockPosition position, final int size, final String... validBlockTags) {
         this.user = user;
@@ -78,6 +88,11 @@ public abstract class Container {
     public abstract FullContainerName getFullContainerName(int slot);
 
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (action == ContainerInput.QUICK_CRAFT) {
+            return this.handleDragClick(revision, javaSlot, button);
+        }
+        this.dragMode = -1;
+        this.dragSlots.clear();
         if (javaSlot == -1) {
             return false;
         }
@@ -115,6 +130,177 @@ public abstract class Container {
         PlayerActionPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[] {request});
 
         return true;
+    }
+
+    protected boolean craftOutput(final int revision, final int recipeId, final BedrockItem output, final Map<Integer, Integer> consumed, final boolean quickMove) {
+        final InventoryTracker inventory = this.user.get(InventoryTracker.class);
+        final Container cursorContainer = inventory.getHudContainer();
+        final Container destination = quickMove ? inventory.getInventoryContainer() : cursorContainer;
+        final BedrockItem cursor = cursorContainer.getItem(0);
+        final int maxStack = this.user.get(ItemRewriter.class).maxStackSize(output);
+        if (output.isEmpty() || output.amount() <= 0 || consumed.isEmpty()) {
+            return false;
+        }
+        int crafts = quickMove ? maxStack / output.amount() : 1;
+        for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
+            final BedrockItem input = this.getItem(ingredient.getKey());
+            if (ingredient.getValue() <= 0 || input.netId() == null) {
+                return false;
+            }
+            crafts = Math.min(crafts, Math.min(input.amount() / ingredient.getValue(), 255 / ingredient.getValue()));
+        }
+        final Map<Integer, Integer> destinations = new LinkedHashMap<>();
+        int capacity = 0;
+        if (quickMove) {
+            for (boolean merge : new boolean[]{true, false}) {
+                for (int javaSlot = 44; javaSlot >= 9; javaSlot--) {
+                    final int slot = destination.bedrockSlot(javaSlot);
+                    final BedrockItem item = destination.getItem(slot);
+                    if (merge ? item.isEmpty() || item.isDifferent(output) || item.netId() == null : !item.isEmpty()) {
+                        continue;
+                    }
+                    final int room = Math.max(0, maxStack - item.amount());
+                    if (room > 0) {
+                        destinations.put(slot, room);
+                        capacity += room;
+                    }
+                }
+            }
+        } else {
+            if (!cursor.isEmpty() && (cursor.isDifferent(output) || cursor.netId() == null)) {
+                return false;
+            }
+            capacity = Math.max(0, maxStack - cursor.amount());
+            destinations.put(0, capacity);
+        }
+        crafts = Math.min(crafts, capacity / output.amount());
+        if (crafts <= 0) {
+            return false;
+        }
+        final InventoryRequestTracker requests = this.user.get(InventoryRequestTracker.class);
+        final int requestId = requests.nextRequestId();
+        final List<Container> snapshots = List.of(this.copy(), destination.copy());
+        final Container cursorSnapshot = cursorContainer.copy();
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
+        actions.add(new ItemStackRequestAction.CraftRecipeAction(recipeId, crafts));
+        for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
+            final int slot = ingredient.getKey();
+            actions.add(new ItemStackRequestAction.ConsumeAction(ingredient.getValue() * crafts,
+                    new ItemStackRequestSlotInfo(this.getFullContainerName(slot), (byte) slot, this.getItem(slot).netId())));
+        }
+        int remaining = output.amount() * crafts;
+        final Map<Integer, BedrockItem> updates = new LinkedHashMap<>();
+        for (Map.Entry<Integer, Integer> entry : destinations.entrySet()) {
+            final int amount = Math.min(remaining, entry.getValue());
+            if (amount <= 0) {
+                continue;
+            }
+            final int slot = entry.getKey();
+            final BedrockItem previous = destination.getItem(slot);
+            actions.add(new ItemStackRequestAction.TakeAction(amount,
+                    new ItemStackRequestSlotInfo(this.getFullContainerName(50), (byte) 50, requestId),
+                    new ItemStackRequestSlotInfo(destination.getFullContainerName(slot), (byte) slot, previous.isEmpty() ? 0 : previous.netId())));
+            final BedrockItem placed = output.copy();
+            placed.setAmount(previous.amount() + amount);
+            placed.setNetId(previous.isEmpty() ? requestId : previous.netId());
+            updates.put(slot, placed);
+            remaining -= amount;
+        }
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        requests.addRequest(new InventoryRequestStorage(request, revision, cursorSnapshot, snapshots));
+        for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
+            this.setItem(ingredient.getKey(), this.itemAfterRemovingAmount(this.getItem(ingredient.getKey()), ingredient.getValue() * crafts));
+        }
+        for (Map.Entry<Integer, BedrockItem> update : updates.entrySet()) {
+            destination.setItem(update.getKey(), update.getValue());
+        }
+        PlayerActionPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[]{request});
+        PacketFactory.sendJavaContainerSetContent(this.user, this);
+        if (quickMove) {
+            PacketFactory.sendJavaContainerSetContent(this.user, destination);
+        }
+        return true;
+    }
+
+    private boolean handleDragClick(final int revision, final short javaSlot, final byte button) {
+        final int stage = button & 3;
+        final int mode = (button >> 2) & 3;
+        final InventoryTracker inventory = this.user.get(InventoryTracker.class);
+        final BedrockItem cursor = inventory.getHudContainer().getItem(0);
+        if (stage == 0) {
+            this.dragSlots.clear();
+            this.dragMode = mode <= 1 && !cursor.isEmpty() && cursor.netId() != null ? mode : -1;
+            this.dragCursor = cursor.copy();
+            return this.dragMode != -1;
+        }
+        if (this.dragMode != mode || this.dragCursor == null || cursor.isDifferent(this.dragCursor)
+                || cursor.amount() != this.dragCursor.amount() || !Objects.equals(cursor.netId(), this.dragCursor.netId())) {
+            this.dragMode = -1;
+            this.dragSlots.clear();
+            return false;
+        }
+        final InventoryRequestTracker requests = this.user.get(InventoryRequestTracker.class);
+        final ClickContext context = new ClickContext(this, this.bedrockSlot(javaSlot), inventory, requests);
+        if (stage == 1) {
+            final SlotRef slot = this.resolveJavaSlot(context, javaSlot);
+            if (slot != null && this.isDragDestination(slot, cursor) && this.dragSlots.size() < cursor.amount()) {
+                this.dragSlots.add(javaSlot);
+            }
+            return true;
+        }
+        if (stage != 2) {
+            this.dragMode = -1;
+            this.dragSlots.clear();
+            return false;
+        }
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
+        final Set<Container> snapshots = Collections.newSetFromMap(new IdentityHashMap<>());
+        final int perSlot = mode == 1 ? 1 : cursor.amount() / Math.max(1, this.dragSlots.size());
+        for (short slotNumber : this.dragSlots) {
+            context.container = this;
+            context.bedrockSlot = this.bedrockSlot(slotNumber);
+            final SlotRef slot = this.resolveJavaSlot(context, slotNumber);
+            final BedrockItem remaining = inventory.getHudContainer().getItem(0);
+            if (remaining.isEmpty() || slot == null || !this.isDragDestination(slot, remaining)) {
+                continue;
+            }
+            if (snapshots.add(slot.container())) {
+                context.prevContainers.add(slot.container().copy());
+            }
+            final BedrockItem destination = slot.container().getItem(slot.bedrockSlot());
+            final int amount = Math.min(perSlot, Math.min(remaining.amount(),
+                    this.user.get(ItemRewriter.class).maxStackSize(remaining) - destination.amount()));
+            if (amount <= 0) {
+                continue;
+            }
+            actions.add(new ItemStackRequestAction.PlaceAction(amount,
+                    new ItemStackRequestSlotInfo(inventory.getHudContainer().getFullContainerName(0), (byte) 0, remaining.netId()),
+                    new ItemStackRequestSlotInfo(slot.container().getFullContainerName(slot.bedrockSlot()), (byte) slot.bedrockSlot(), destination.isEmpty() ? 0 : destination.netId())));
+            final BedrockItem placed = remaining.copy();
+            placed.setAmount(destination.amount() + amount);
+            placed.setNetId(destination.isEmpty() ? remaining.netId() : destination.netId());
+            slot.container().setItem(slot.bedrockSlot(), placed);
+            inventory.getHudContainer().setItem(0, this.itemAfterRemovingAmount(remaining, amount));
+        }
+        this.dragSlots.clear();
+        this.dragMode = -1;
+        if (actions.isEmpty()) {
+            return false;
+        }
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requests.nextRequestId(), actions, List.of(), TextProcessingEventOrigin.unknown);
+        requests.addRequest(new InventoryRequestStorage(request, revision, context.prevCursorContainer, context.prevContainers));
+        PlayerActionPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[]{request});
+        return true;
+    }
+
+    private boolean isDragDestination(final SlotRef slot, final BedrockItem cursor) {
+        final ContainerEnumName name = slot.container().getFullContainerName(slot.bedrockSlot()).name();
+        if (name == ContainerEnumName.CreatedOutputContainer || name == ContainerEnumName.CraftingOutputPreviewContainer) {
+            return false;
+        }
+        final BedrockItem item = slot.container().getItem(slot.bedrockSlot());
+        return (item.isEmpty() || (!item.isDifferent(cursor) && item.netId() != null))
+                && item.amount() < this.user.get(ItemRewriter.class).maxStackSize(cursor);
     }
 
     private ItemStackRequestAction handlePickupClick(final ClickContext clickContext, final short javaSlot, final byte button) {
@@ -315,6 +501,16 @@ public abstract class Container {
 
         final List<ItemStackRequestAction> actions = new ArrayList<>();
         final List<QuickMoveRange> ranges = this.quickMoveRanges(javaSlot, source);
+        final Set<Container> snapshots = Collections.newSetFromMap(new IdentityHashMap<>());
+        snapshots.add(this);
+        if (snapshots.add(source.container())) {
+            clickContext.prevContainers.add(source.container().copy());
+        }
+        for (QuickMoveRange range : ranges) {
+            if (snapshots.add(range.container())) {
+                clickContext.prevContainers.add(range.container().copy());
+            }
+        }
         for (boolean mergePass : new boolean[]{true, false}) {
             for (QuickMoveRange range : ranges) {
                 final int start = range.backwards() ? range.endJavaSlot() - 1 : range.startJavaSlot();
@@ -326,7 +522,7 @@ public abstract class Container {
                         continue;
                     }
                     final BedrockItem destinationItem = range.container().getItem(bedrockDestSlot);
-                    final int slotMaxStackSize = itemRewriter.maxStackSize(destinationItem);
+                    final int slotMaxStackSize = itemRewriter.maxStackSize(sourceItem);
                     if (mergePass) {
                         if (destinationItem == null || destinationItem.isEmpty() || destinationItem.isDifferent(sourceItem) || destinationItem.amount() >= slotMaxStackSize) {
                             continue;
@@ -344,8 +540,6 @@ public abstract class Container {
 
                     final int destNetId = destinationItem != null && !destinationItem.isEmpty() ? destinationItem.netId() : 0;
 
-                    clickContext.prevContainers.add(source.container());
-                    clickContext.prevContainers.add(range.container());
                     actions.add(new ItemStackRequestAction.PlaceAction(
                             amountToMove,
                             new ItemStackRequestSlotInfo(source.container().getFullContainerName(source.bedrockSlot()), (byte) source.bedrockSlot(), sourceItem.netId()),
@@ -508,8 +702,7 @@ public abstract class Container {
 
         if (source.container() != inventory && source.container() != inventoryTracker.getArmorContainer() && source.container() != inventoryTracker.getOffhandContainer()) {
             return List.of(
-                    new QuickMoveRange(inventory, 0, 9, true),
-                    new QuickMoveRange(inventory, 9, inventory.size(), true)
+                    new QuickMoveRange(inventory, 9, 45, true)
             );
         }
 
@@ -607,7 +800,7 @@ public abstract class Container {
             }
         }
 
-        if (bedrockSlot < 0 || bedrockSlot >= container.size()) {
+        if (bedrockSlot < 0 || (container instanceof InventoryContainer && bedrockSlot >= container.size())) {
             return null;
         }
         return new SlotRef(container, bedrockSlot);
