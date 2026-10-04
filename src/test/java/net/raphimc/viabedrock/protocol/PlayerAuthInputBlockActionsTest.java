@@ -18,6 +18,7 @@
 package net.raphimc.viabedrock.protocol;
 
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
+import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import io.netty.buffer.Unpooled;
@@ -34,7 +35,7 @@ final class PlayerAuthInputBlockActionsTest {
 
     @Test
     void mixedStopAndStartMatchesBedrockWireFormat() throws Exception {
-        final PacketWrapper wrapper = PacketWrapper.create(ServerboundBedrockPackets.PLAYER_AUTH_INPUT, null);
+        final PacketWrapper wrapper = PacketWrapper.create(ServerboundBedrockPackets.PLAYER_AUTH_INPUT, (UserConnection) null);
         PlayerActionPacketFactory.writeAuthInputBlockActions(wrapper, List.of(
             new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock),
             new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StartDestroyBlock, new BlockPosition(1, 2, 3), 5)
@@ -54,9 +55,10 @@ final class PlayerAuthInputBlockActionsTest {
 
     @Test
     void creativeDestroyCannotBeEncodedAsAnAuthInputBlockAction() {
-        final PacketWrapper wrapper = PacketWrapper.create(ServerboundBedrockPackets.PLAYER_AUTH_INPUT, null);
+        final PacketWrapper wrapper = PacketWrapper.create(ServerboundBedrockPackets.PLAYER_AUTH_INPUT, (UserConnection) null);
         assertThrows(IllegalArgumentException.class, () -> PlayerActionPacketFactory.writeAuthInputBlockActions(wrapper, List.of(
             new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CreativeDestroyBlock, new BlockPosition(0, 0, 0), 0)
         )));
     }
 }
+

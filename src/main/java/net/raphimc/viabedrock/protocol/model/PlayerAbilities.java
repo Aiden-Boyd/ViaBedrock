@@ -18,6 +18,7 @@
 package net.raphimc.viabedrock.protocol.model;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.AbilitiesIndex;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerPermissionLevel;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.SerializedAbilitiesData_SerializedAbilitiesLayer;
 
 import java.util.EnumMap;
@@ -37,6 +38,28 @@ public record PlayerAbilities(long entityUniqueId, byte playerPermission, byte c
             EnumSet.of(AbilitiesIndex.Build, AbilitiesIndex.Mine, AbilitiesIndex.DoorsAndSwitches, AbilitiesIndex.OpenContainers, AbilitiesIndex.AttackPlayers, AbilitiesIndex.AttackMobs),
             0.1F, 0.05F, 1F
         ));
+    }
+
+    /** World interaction permissions are server abilities, never implied by creative mode or operator status. */
+    public boolean mayInteract(final AbilitiesIndex ability) {
+        if (this.playerPermission == PlayerPermissionLevel.Visitor.getValue()) {
+            switch (ability) {
+                case Build, Mine, DoorsAndSwitches, OpenContainers, AttackPlayers, AttackMobs -> {
+                    return false;
+                }
+            }
+        }
+        return this.getBooleanValue(ability);
+    }
+
+    public boolean mayUseBlock(final boolean container, final boolean switchOrDoor, final boolean immutableWorld) {
+        if (container) {
+            return this.mayInteract(AbilitiesIndex.OpenContainers);
+        }
+        if (switchOrDoor) {
+            return this.mayInteract(AbilitiesIndex.DoorsAndSwitches);
+        }
+        return !immutableWorld && this.mayInteract(AbilitiesIndex.Build);
     }
 
     public boolean getBooleanValue(final AbilitiesIndex ability) {
@@ -82,3 +105,4 @@ public record PlayerAbilities(long entityUniqueId, byte playerPermission, byte c
     }
 
 }
+

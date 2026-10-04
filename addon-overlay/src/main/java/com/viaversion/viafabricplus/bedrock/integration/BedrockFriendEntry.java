@@ -35,7 +35,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
-public final class BedrockFriendEntry extends ServerSelectionList.Entry {
+public final class BedrockFriendEntry extends ServerSelectionList.OnlineServerEntry {
 
     private final JoinMultiplayerScreen screen;
     private final ServerSelectionList list;
@@ -45,6 +45,8 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
 
     public BedrockFriendEntry(final JoinMultiplayerScreen screen, final ServerSelectionList list,
                               final FriendWorld world, final Component status) {
+        list.super(screen, new net.minecraft.client.multiplayer.ServerData(world.worldName(),
+            "Xbox: " + world.hostName(), net.minecraft.client.multiplayer.ServerData.Type.OTHER));
         this.screen = screen;
         this.list = list;
         this.world = world;
@@ -54,6 +56,11 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
 
     public String key() {
         return this.world == null ? "bedrock-friends" : this.world.handleId();
+    }
+
+    public boolean available() {
+        return this.account == ViaFabricPlusBedrock.impl().account().get()
+            && !BedrockMenuJoiner.isJoining() && BedrockMenuJoiner.joinable(this.world);
     }
 
     @Override
@@ -81,10 +88,11 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
             left, y, 0, 0, 32, 32, 32, 32);
         graphics.text(font, font.plainSubstrByWidth(this.world.worldName(),
             Math.max(0, width - font.width(count) - 8)), x, y + 1, -1);
-        graphics.text(font, count, x + width - font.width(count), y + 1, 0xFFAAAAAA);
+        graphics.text(font, count, x + width - font.width(count), y + 1,
+            BedrockMenuJoiner.joinable(this.world) ? 0xFFAAAAAA : 0xFFFF5555);
         graphics.text(font, font.plainSubstrByWidth(this.world.hostName(), width), x, y + 12, 0xFF808080);
         graphics.text(font, font.plainSubstrByWidth("Bedrock " + this.world.version(), width), x, y + 23, 0xFF808080);
-        if (hovered) {
+        if (hovered && this.available()) {
             graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.withDefaultNamespace("server_list/join"),
                 left, y, 32, 32);
         }
@@ -96,7 +104,7 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
             return false;
         }
         this.list.setSelected(this);
-        if (doubleClick || event.x() - this.getContentX() < 32) {
+        if (doubleClick || (event.x() >= this.getContentX() && event.x() - this.getContentX() < 32)) {
             this.join();
         }
         return true;
@@ -108,12 +116,12 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
             this.join();
             return true;
         }
-        return super.keyPressed(event);
+        return false; // Live friend rows cannot reorder saved servers with Shift+arrow.
     }
 
     @Override
     public void join() {
-        if (this.world != null) {
+        if (this.world != null && this.available()) {
             if (this.account != ViaFabricPlusBedrock.impl().account().get()) {
                 return;
             }
@@ -125,3 +133,4 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
         }
     }
 }
+

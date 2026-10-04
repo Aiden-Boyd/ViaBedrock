@@ -333,8 +333,9 @@ public final class ClientPlayerPackets {
             final int sequence = wrapper.read(Types.VAR_INT); // sequence number
 
             final boolean isMining = action == PlayerActionAction.START_DESTROY_BLOCK || action == PlayerActionAction.ABORT_DESTROY_BLOCK || action == PlayerActionAction.STOP_DESTROY_BLOCK || action == PlayerActionAction.CHANGE_DESTROY_DIRECTION;
-            if (isMining && (gameSession.isImmutableWorld() || !clientPlayer.abilities().getBooleanValue(AbilitiesIndex.Mine))) {
-                // TODO: Prevent breaking and cancel any packets that would be sent (swing, player action)
+            if (isMining && (gameSession.isImmutableWorld() || !clientPlayer.abilities().mayInteract(AbilitiesIndex.Mine))) {
+                clientPlayer.setBlockBreakingInfo(null);
+                clientPlayer.suppressPostBreakSwings();
                 PacketFactory.sendJavaBlockUpdate(wrapper.user(), position, chunkTracker.getJavaBlockState(position));
                 chunkTracker.acknowledgeBlockSequence(sequence);
                 return;
@@ -342,11 +343,13 @@ public final class ClientPlayerPackets {
 
             switch (action) {
                 case START_DESTROY_BLOCK -> {
+                    clientPlayer.resumeBlockBreakingSwings();
                     clientPlayer.sendSwingPacketToServer();
                     clientPlayer.cancelNextSwingPacket();
 
                     if (clientPlayer.javaGameMode() == GameMode.CREATIVE) {
                         clientPlayer.setBlockBreakingInfo(null);
+                        clientPlayer.suppressPostBreakSwings();
                         clientPlayer.sendPlayerActionPacketToServer(PlayerActionType.CreativeDestroyBlock, position, direction.ordinal());
                         chunkTracker.handleBlockChange(position, 0, chunkTracker.bedrockAirId());
                         PacketFactory.sendJavaBlockUpdate(wrapper.user(), position, ProtocolConstants.JAVA_AIR_ID);
@@ -354,7 +357,6 @@ public final class ClientPlayerPackets {
                         clientPlayer.setBlockBreakingInfo(new ClientPlayerEntity.BlockBreakingInfo(position, direction));
                         // TODO: Handle instant breaking
                         // TODO: Test breaking fire
-                        // TODO: The java client keeps spamming swing packets while waiting for the block break cooldown. Those need to be cancelled
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StartDestroyBlock, position, direction.ordinal()));
                     }
                 }
@@ -372,6 +374,7 @@ public final class ClientPlayerPackets {
                     clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, position, direction.ordinal()));
                 }
                 case STOP_DESTROY_BLOCK -> {
+                    clientPlayer.suppressPostBreakSwings();
                     clientPlayer.cancelNextSwingPacket();
                     clientPlayer.setBlockBreakingInfo(null);
 
@@ -431,7 +434,9 @@ public final class ClientPlayerPackets {
             final InventoryContainer inventoryContainer = wrapper.user().get(InventoryTracker.class).getInventoryContainer();
             final int entityId = wrapper.read(Types.VAR_INT); // entity id
             final Entity entity = entityTracker.getEntityByJid(entityId);
-            if (entity == null) {
+            if (entity == null || !entityTracker.getClientPlayer().abilities().mayInteract(
+                    entity instanceof net.raphimc.viabedrock.api.model.entity.PlayerEntity ? AbilitiesIndex.AttackPlayers : AbilitiesIndex.AttackMobs)) {
+                entityTracker.getClientPlayer().cancelNextSwingPacket();
                 wrapper.cancel();
                 return;
             }
@@ -460,7 +465,7 @@ public final class ClientPlayerPackets {
                 return;
             }
             final InteractionHand hand = InteractionHand.values()[wrapper.read(Types.VAR_INT)]; // hand
-            if (hand != InteractionHand.MAIN_HAND) {
+            if (hand != InteractionHand.MAIN_HAND || entityTracker.getClientPlayer().abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()) {
                 wrapper.cancel();
                 return;
             }
@@ -682,6 +687,10 @@ public final class ClientPlayerPackets {
             final ClientPlayerEntity clientPlayer = wrapper.user().get(EntityTracker.class).getClientPlayer();
             final byte flags = wrapper.read(Types.BYTE); // flags
             final boolean flying = (flags & AbilitiesFlag.FLYING.getBit()) != 0;
+            if (flying && !clientPlayer.abilities().getBooleanValue(AbilitiesIndex.MayFly)) {
+                clientPlayer.setAbilities(clientPlayer.abilities());
+                return;
+            }
             if (flying != clientPlayer.abilities().getBooleanValue(AbilitiesIndex.Flying)) {
                 clientPlayer.abilities().getOrCreateCacheLayer().setAbility(AbilitiesIndex.Flying, flying);
                 clientPlayer.addAuthInputData(flying ? PlayerAuthInputData.StartFlying : PlayerAuthInputData.StopFlying);
@@ -709,7 +718,7 @@ public final class ClientPlayerPackets {
         protocol.registerServerbound(ServerboundPackets26_3.PUNCH, ServerboundBedrockPackets.ANIMATE, wrapper -> {
             final GameSessionStorage gameSession = wrapper.user().get(GameSessionStorage.class);
             final ClientPlayerEntity clientPlayer = wrapper.user().get(EntityTracker.class).getClientPlayer();
-            if (clientPlayer.checkCancelSwingPacket()) {
+            if (clientPlayer.checkCancelSwingPacket() || clientPlayer.abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()) {
                 wrapper.cancel();
                 return;
             }
@@ -734,3 +743,4 @@ public final class ClientPlayerPackets {
     }
 
 }
+

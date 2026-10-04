@@ -28,6 +28,10 @@ public final class BlockConnections {
             "workbench", "furnace", "blast_furnace", "smoker", "brewing_stand", "enchanting_table", "stonecutter",
             "anvil", "smithing_table", "grindstone", "loom", "cartography_table", "beacon", "dispenser", "dropper", "hopper", "crafter");
 
+    public static boolean isContainerInteraction(final String tag) {
+        return tag != null && CONTAINER_TAGS.contains(tag);
+    }
+
     public static boolean usesBlockInteraction(final BlockState state, final String tag) {
         if (tag != null && CONTAINER_TAGS.contains(tag)) {
             return true;
@@ -104,3 +108,4 @@ public final class BlockConnections {
     }
 
 }
+

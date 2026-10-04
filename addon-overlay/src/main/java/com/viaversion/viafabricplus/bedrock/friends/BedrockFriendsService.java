@@ -52,6 +52,7 @@ public final class BedrockFriendsService {
     private static final URI RTA = URI.create("wss://rta.xboxlive.com/connect");
     private static final String SCID = "4fc10100-5f7a-4470-899b-280835760c07";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private static final Object SESSION_LOCK = new Object();
     private static final AtomicReference<JoinedWorld> CURRENT_WORLD = new AtomicReference<>();
 
     private BedrockFriendsService() {
@@ -102,73 +103,80 @@ public final class BedrockFriendsService {
 
     public static CompletableFuture<JoinedWorld> join(final BedrockAuthManager account, final FriendWorld world) {
         return CompletableFuture.supplyAsync(() -> {
-            RtaSubscription subscription = null;
-            JoinedWorld joined = null;
-            try {
-                final XblXstsToken token = account.getXboxLiveXstsToken().getUpToDate();
-                final String xuid = account.getXboxUserProfile().getUpToDate().getId();
-                subscription = RtaSubscription.open(token);
-
-                final JsonObject systemConstants = new JsonObject();
-                systemConstants.addProperty("initialize", true);
-                systemConstants.addProperty("xuid", xuid);
-                final JsonObject constants = new JsonObject();
-                constants.add("system", systemConstants);
-                final JsonObject subscriptionInfo = new JsonObject();
-                subscriptionInfo.addProperty("id", UUID.randomUUID().toString().toUpperCase());
-                final JsonArray changes = new JsonArray();
-                changes.add("everything");
-                subscriptionInfo.add("changeTypes", changes);
-                final JsonObject systemProperties = new JsonObject();
-                systemProperties.addProperty("active", true);
-                systemProperties.addProperty("connection", subscription.connectionId());
-                systemProperties.add("subscription", subscriptionInfo);
-                final JsonObject properties = new JsonObject();
-                properties.add("system", systemProperties);
-                final JsonObject me = new JsonObject();
-                me.add("constants", constants);
-                me.add("properties", properties);
-                final JsonObject members = new JsonObject();
-                members.add("me", me);
-                final JsonObject body = new JsonObject();
-                body.add("members", members);
-
-                final URI handle = DIRECTORY.resolve("handles/" + UUID.fromString(world.handleId()) + "/session");
-                final HttpResponse<String> response = updateSession(handle, body, token);
-                if (response.statusCode() != 200) {
-                    throw BedrockXboxError.response("Xbox session join", response);
-                }
-                final URI sessionUri = sessionUri(response);
-                joined = new JoinedWorld(sessionUri, account, subscription);
-                final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
-                while (System.nanoTime() < deadline) {
-                    final JsonObject session = request(sessionUri, "GET", null, token);
-                    final JsonObject worldData = object(object(session, "properties"), "custom");
-                    final JsonObject nonces = object(worldData, "nonces");
-                    final String nonce = string(nonces, xuid);
-                    final SocketAddress updatedAddress = connection(worldData);
-                    final SocketAddress address = updatedAddress != null ? updatedAddress : world.address();
-                    if (!nonce.isBlank() && address != null) {
-                        joined.ready(address, nonce);
-                        final JoinedWorld old = CURRENT_WORLD.getAndSet(joined);
-                        if (old != null) {
-                            CompletableFuture.runAsync(old::close);
-                        }
-                        return joined;
-                    }
-                    Thread.sleep(500);
-                }
-                throw new IOException("The world host did not authorize the session in time");
-            } catch (Exception exception) {
-                if (joined != null) {
-                    joined.close();
-                } else if (subscription != null) {
-                    subscription.close();
-                }
-                throw new IllegalStateException("Could not join the friend's world", exception);
+            synchronized (SESSION_LOCK) {
+                return joinBlocking(account, world);
             }
         });
     }
+
+    private static JoinedWorld joinBlocking(final BedrockAuthManager account, final FriendWorld world) {
+        final JoinedWorld previous = CURRENT_WORLD.getAndSet(null);
+        if (previous != null) {
+            previous.close();
+        }
+        RtaSubscription subscription = null;
+        JoinedWorld joined = null;
+        try {
+            final XblXstsToken token = account.getXboxLiveXstsToken().getUpToDate();
+            final String xuid = account.getXboxUserProfile().getUpToDate().getId();
+            subscription = RtaSubscription.open(token);
+
+            final JsonObject systemConstants = new JsonObject();
+            systemConstants.addProperty("initialize", true);
+            systemConstants.addProperty("xuid", xuid);
+            final JsonObject constants = new JsonObject();
+            constants.add("system", systemConstants);
+            final JsonObject subscriptionInfo = new JsonObject();
+            subscriptionInfo.addProperty("id", UUID.randomUUID().toString().toUpperCase());
+            final JsonArray changes = new JsonArray();
+            changes.add("everything");
+            subscriptionInfo.add("changeTypes", changes);
+            final JsonObject systemProperties = new JsonObject();
+            systemProperties.addProperty("active", true);
+            systemProperties.addProperty("connection", subscription.connectionId());
+            systemProperties.add("subscription", subscriptionInfo);
+            final JsonObject properties = new JsonObject();
+            properties.add("system", systemProperties);
+            final JsonObject me = new JsonObject();
+            me.add("constants", constants);
+            me.add("properties", properties);
+            final JsonObject members = new JsonObject();
+            members.add("me", me);
+            final JsonObject body = new JsonObject();
+            body.add("members", members);
+
+            final URI handle = DIRECTORY.resolve("handles/" + UUID.fromString(world.handleId()) + "/session");
+            final HttpResponse<String> response = updateSession(handle, body, token);
+            if (response.statusCode() != 200) {
+                throw BedrockXboxError.response("Xbox session join", response);
+            }
+            final URI sessionUri = sessionUri(response);
+            joined = new JoinedWorld(sessionUri, account, subscription);
+            final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+            while (System.nanoTime() < deadline) {
+                final JsonObject session = request(sessionUri, "GET", null, token);
+                final JsonObject worldData = object(object(session, "properties"), "custom");
+                final JsonObject nonces = object(worldData, "nonces");
+                final String nonce = string(nonces, xuid);
+                final SocketAddress updatedAddress = connection(worldData);
+                final SocketAddress address = updatedAddress != null ? updatedAddress : world.address();
+                if (!nonce.isBlank() && address != null) {
+                    joined.ready(address, nonce);
+                    CURRENT_WORLD.set(joined);
+                    return joined;
+                }
+                Thread.sleep(500);
+            }
+            throw new IOException("The world host did not authorize the session in time");
+        } catch (Exception exception) {
+            if (joined != null) {
+                joined.close();
+            } else if (subscription != null) {
+                subscription.close();
+            }
+            throw new IllegalStateException("Could not join the friend's world", exception);
+        }
+}
 
     public static @Nullable String nonceFor(final SocketAddress remote) {
         final JoinedWorld world = CURRENT_WORLD.get();
@@ -286,6 +294,7 @@ public final class BedrockFriendsService {
         private final RtaSubscription subscription;
         private volatile SocketAddress address;
         private volatile String nonce;
+        private boolean closed;
 
         private JoinedWorld(final URI sessionUri, final BedrockAuthManager account, final RtaSubscription subscription) {
             this.sessionUri = sessionUri;
@@ -308,6 +317,20 @@ public final class BedrockFriendsService {
 
         @Override
         public void close() {
+            synchronized (SESSION_LOCK) {
+                if (this.closed) return;
+                this.closed = true;
+                final JoinedWorld active = CURRENT_WORLD.get();
+                if (active != null && active != this && active.account == this.account && active.sessionUri.equals(this.sessionUri)) {
+                    // An old disconnect must not remove a newer membership in the same world.
+                    this.subscription.close();
+                    return;
+                }
+                this.closeMembership();
+            }
+        }
+
+        private void closeMembership() {
             try {
                 final JsonObject members = new JsonObject();
                 members.add("me", null);
@@ -391,3 +414,4 @@ public final class BedrockFriendsService {
     }
 
 }
+

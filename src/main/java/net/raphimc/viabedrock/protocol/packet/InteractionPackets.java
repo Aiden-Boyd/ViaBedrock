@@ -50,6 +50,7 @@ import net.raphimc.viabedrock.protocol.rewriter.InventoryTransactionRewriter;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.GameSessionStorage;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
 import java.util.List;
@@ -60,6 +61,12 @@ public final class InteractionPackets {
     public static boolean handlePlayerAction(final PacketWrapper wrapper, final PlayerActionAction action) {
         final InventoryTransactionRewriter transactionRewriter = wrapper.user().get(InventoryTransactionRewriter.class);
         final InventoryContainer inventory = wrapper.user().get(InventoryTracker.class).getInventoryContainer();
+
+        if ((action == PlayerActionAction.RELEASE_USE_ITEM || action == PlayerActionAction.DROP_ITEM || action == PlayerActionAction.DROP_ALL_ITEMS)
+                && wrapper.user().get(EntityTracker.class).getClientPlayer().abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()) {
+            PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventory);
+            return true;
+        }
 
         if (action == PlayerActionAction.RELEASE_USE_ITEM) {
             final BedrockInventoryTransaction transaction = new BedrockInventoryTransaction(
@@ -135,13 +142,14 @@ public final class InteractionPackets {
             final InventoryTransactionRewriter inventoryTransactionRewriter = wrapper.user().get(InventoryTransactionRewriter.class);
 
             final int hand = wrapper.read(Types.VAR_INT); // hand
-            wrapper.read(Types.VAR_INT); // sequence
+            final int sequence = wrapper.read(Types.VAR_INT); // sequence
             wrapper.read(Types.FLOAT); // yaw
             wrapper.read(Types.FLOAT); // pitch
 
             // Bedrock can't hold the majority of item in offhand and can't use any either.
             // TODO: We need to handle cases where the item changes, or it affect player movement (eg: eating/blocking/etc)
-            if (hand != InteractionHand.MAIN_HAND.ordinal()) {
+            if (hand != InteractionHand.MAIN_HAND.ordinal() || entityTracker.getClientPlayer().abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()) {
+                wrapper.user().get(ChunkTracker.class).acknowledgeBlockSequence(sequence);
                 wrapper.cancel();
                 return;
             }
@@ -202,6 +210,19 @@ public final class InteractionPackets {
                 chunkTracker.acknowledgeBlockSequence(sequence);
                 return;
             }
+            final BlockState clickedState = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(chunkTracker.getJavaBlockState(position));
+            final String clickedTag = wrapper.user().get(BlockStateRewriter.class).tag(chunkTracker.getBlockState(position));
+            final boolean usesBlock = !clientPlayer.isSneaking() && BlockConnections.usesBlockInteraction(clickedState, clickedTag);
+            if (!clientPlayer.abilities().mayUseBlock(usesBlock && BlockConnections.isContainerInteraction(clickedTag),
+                    usesBlock && !BlockConnections.isContainerInteraction(clickedTag), wrapper.user().get(GameSessionStorage.class).isImmutableWorld())) {
+                // Repair both clicked blocks and predicted placement, without sending an item-use transaction.
+                PacketFactory.sendJavaBlockUpdate(wrapper.user(), position, chunkTracker.getJavaBlockState(position));
+                final BlockPosition adjacent = position.getRelative(face);
+                PacketFactory.sendJavaBlockUpdate(wrapper.user(), adjacent, chunkTracker.getJavaBlockState(adjacent));
+                PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                chunkTracker.acknowledgeBlockSequence(sequence);
+                return;
+            }
             chunkTracker.deferBlockAcknowledgement(sequence, position, position.getRelative(face));
 
             // The bedrock client will send a start item use on action to the server first.
@@ -218,10 +239,7 @@ public final class InteractionPackets {
             final PacketWrapper transactionPacket = PacketWrapper.create(ServerboundBedrockPackets.INVENTORY_TRANSACTION, wrapper.user());
 
             BedrockItem predictedToItem = inventoryTracker.getInventoryContainer().getSelectedHotbarItem().copy();
-            // This is not entirely correct, but at least it's more accurate than not sending actions or sending the original item data.
-            final BlockState clickedState = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(chunkTracker.getJavaBlockState(position));
-            final String clickedTag = wrapper.user().get(BlockStateRewriter.class).tag(chunkTracker.getBlockState(position));
-            final boolean usesBlock = !clientPlayer.isSneaking() && BlockConnections.usesBlockInteraction(clickedState, clickedTag);
+            // Predict consumption only after the server-granted interaction permission has been checked.
             if (!usesBlock && predictedToItem.blockRuntimeId() != 0 && clientPlayer.javaGameMode() != GameMode.CREATIVE) {
                 predictedToItem.setAmount(predictedToItem.amount() - 1);
             }
@@ -317,3 +335,4 @@ public final class InteractionPackets {
     }
 
 }
+

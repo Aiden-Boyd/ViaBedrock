@@ -60,10 +60,11 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
         this.viaBedrock$friends.refresh(account, System.nanoTime(), TimeUnit.SECONDS.toNanos(30),
             () -> BedrockFriendsService.worlds(account).thenApply(worlds -> {
                 final var unique = new LinkedHashMap<String, FriendWorld>();
-                worlds.stream().filter(BedrockMenuJoiner::joinable).forEach(world -> unique.putIfAbsent(world.handleId(), world));
+                worlds.stream().forEach(world -> unique.putIfAbsent(world.handleId(), world));
                 return unique.values().stream().sorted(Comparator.comparing(FriendWorld::hostName, String.CASE_INSENSITIVE_ORDER)
                     .thenComparing(FriendWorld::worldName, String.CASE_INSENSITIVE_ORDER)).toList();
             }), Minecraft.getInstance(), this::viaBedrock$updateList);
+        this.useBedrockFriendButtons(ci);
     }
 
     @Inject(method = "init", at = @At("TAIL"))
@@ -74,8 +75,8 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
 
     @Inject(method = "onSelectedChange", at = @At("TAIL"))
     private void useBedrockFriendButtons(final CallbackInfo ci) {
-        if (this.serverSelectionList.getSelected() instanceof BedrockFriendEntry) {
-            this.joinButton.active = true;
+        if (this.serverSelectionList.getSelected() instanceof BedrockFriendEntry friend) {
+            this.joinButton.active = friend.available();
             this.editButton.active = false;
             this.deleteButton.active = false;
         }
@@ -93,7 +94,24 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
             return false;
         }
         this.serverSelectionList.setSelected(row.get());
-        return this.joinButton.active && !this.editButton.active && !this.deleteButton.active;
+        if (!(row.get() instanceof ServerSelectionList.OnlineServerEntry) || !this.joinButton.active || this.editButton.active || this.deleteButton.active) {
+            return false;
+        }
+        final var updated = new FriendWorld("menu-qa", "0", "Menu QA", "Menu QA World", "26.3", 2, 8, 0, null);
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(updated), Component.empty());
+        if (!(this.serverSelectionList.getSelected() instanceof BedrockFriendEntry selected) || !selected.key().equals("menu-qa")) {
+            throw new AssertionError("Refreshing a friend row lost its selection");
+        }
+        final var full = new FriendWorld("menu-qa", "0", "Menu QA", "Menu QA World", "26.3", 8, 8, 0, null);
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(full), Component.empty());
+        if (this.joinButton.active) throw new AssertionError("A full friend world left Join enabled");
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(), Component.empty());
+        if (this.serverSelectionList.getSelected() instanceof BedrockFriendEntry || this.joinButton.active) {
+            throw new AssertionError("An offline friend left a stale selection or Join button");
+        }
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(fixture), Component.empty());
+        this.serverSelectionList.setSelected(this.serverSelectionList.children().stream().filter(BedrockFriendEntry.class::isInstance).findFirst().orElseThrow());
+        return true;
     }
 
     @Unique
@@ -109,3 +127,4 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
         ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(this.viaBedrock$friends.worlds(), Component.translatable(key));
     }
 }
+

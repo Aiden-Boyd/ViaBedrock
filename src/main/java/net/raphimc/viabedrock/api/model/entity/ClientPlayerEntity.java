@@ -83,6 +83,7 @@ public class ClientPlayerEntity extends PlayerEntity {
     private GameType gameType;
     private GameMode javaGameMode;
     private boolean cancelNextSwingPacket;
+    private int blockBreakSwingCooldown;
     private BlockBreakingInfo blockBreakingInfo;
 
     public ClientPlayerEntity(final UserConnection user, final long runtimeId, final UUID javaUuid, final PlayerAbilities abilities) {
@@ -99,6 +100,9 @@ public class ClientPlayerEntity extends PlayerEntity {
     @Override
     public void tick() {
         super.tick();
+        if (this.blockBreakSwingCooldown > 0) {
+            this.blockBreakSwingCooldown--;
+        }
 
         this.prevPosition = this.position;
         this.prevOnGround = this.onGround;
@@ -287,6 +291,11 @@ public class ClientPlayerEntity extends PlayerEntity {
     public void setAbilities(final PlayerAbilities abilities, final PacketWrapper javaAbilities) {
         final PlayerAbilities prevAbilities = this.abilities;
         super.setAbilities(abilities);
+        if (!abilities.mayInteract(AbilitiesIndex.Mine)) {
+            this.blockBreakingInfo = null;
+            this.authInputBlockActions.clear();
+            this.suppressPostBreakSwings();
+        }
 
         if (abilities.commandPermission() != prevAbilities.commandPermission()) {
             final CommandsStorage commandsStorage = this.user.get(CommandsStorage.class);
@@ -432,9 +441,18 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
     public boolean checkCancelSwingPacket() {
-        final boolean cancel = this.cancelNextSwingPacket;
+        final boolean cancel = this.cancelNextSwingPacket || (this.blockBreakingInfo == null && this.blockBreakSwingCooldown > 0);
         this.cancelNextSwingPacket = false;
         return cancel;
+    }
+
+    public void suppressPostBreakSwings() {
+        // Java continues swinging during its five-tick block-break delay. These are not missed attacks.
+        this.blockBreakSwingCooldown = 6;
+    }
+
+    public void resumeBlockBreakingSwings() {
+        this.blockBreakSwingCooldown = 0;
     }
 
     public void cancelNextSwingPacket() {
@@ -561,3 +579,4 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
 }
+

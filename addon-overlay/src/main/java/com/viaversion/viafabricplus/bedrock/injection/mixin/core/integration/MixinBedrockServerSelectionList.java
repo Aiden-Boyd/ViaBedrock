@@ -46,6 +46,7 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
     @Unique private List<FriendWorld> viaBedrock$worlds = List.of();
     @Unique private Component viaBedrock$status;
     @Unique private String viaBedrock$selection;
+    @Unique private Object viaBedrock$account;
 
     public MixinBedrockServerSelectionList(final Minecraft client, final int width, final int height, final int y, final int itemHeight) {
         super(client, width, height, y, itemHeight);
@@ -53,7 +54,12 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
 
     @Override
     public void viaBedrock$friends(final List<FriendWorld> worlds, final Component status) {
-        this.viaBedrock$worlds = worlds;
+        final Object account = com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock.impl().account().get();
+        if (this.viaBedrock$account == account && this.viaBedrock$worlds.equals(worlds) && java.util.Objects.equals(this.viaBedrock$status, status)) {
+            return;
+        }
+        this.viaBedrock$account = account;
+        this.viaBedrock$worlds = List.copyOf(worlds);
         this.viaBedrock$status = status;
         this.refreshEntries();
     }
@@ -68,8 +74,13 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
         if (this.viaBedrock$status == null) {
             return;
         }
+        boolean restoredSelection = false;
         for (FriendWorld world : this.viaBedrock$worlds) {
             this.viaBedrock$add(new BedrockFriendEntry(this.screen, (ServerSelectionList) (Object) this, world, Component.empty()));
+            restoredSelection |= world.handleId().equals(this.viaBedrock$selection);
+        }
+        if (this.viaBedrock$selection != null && !restoredSelection) {
+            this.setSelected(null);
         }
     }
 
@@ -81,3 +92,4 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
         }
     }
 }
+

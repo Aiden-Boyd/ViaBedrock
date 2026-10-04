@@ -46,6 +46,10 @@ public final class BedrockMenuJoiner {
 
     private BedrockMenuJoiner() {}
 
+    public static boolean isJoining() {
+        return joining;
+    }
+
     public static boolean joinable(final FriendWorld world) {
         return (world.protocol() == 0 || world.protocol() == ProtocolConstants.BEDROCK_PROTOCOL_VERSION)
             && (world.maxPlayers() <= 0 || world.players() < world.maxPlayers());
@@ -111,18 +115,22 @@ public final class BedrockMenuJoiner {
             return;
         }
         joining = true;
+        final var progress = new com.viaversion.viafabricplus.bedrock.screen.BedrockFriendConnectScreen(parent, world.worldName());
+        client.gui.setScreen(progress);
         BedrockFriendsService.join(account, world).whenCompleteAsync((joined, error) -> {
             joining = false;
             if (error != null) {
                 ViaFabricPlusBedrock.impl().logger().error("Failed to join a Bedrock friend's world", error);
-                if (client.gui.screen() == parent) {
+                if (client.gui.screen() == progress) {
+                    client.gui.setScreen(parent);
                     VFPScreen.showToast(Component.translatable("base.viafabricplus.something_went_wrong"));
                 }
-            } else if (client.gui.screen() != parent || ViaFabricPlusBedrock.impl().account().get() != account) {
+            } else if (client.gui.screen() != progress || ViaFabricPlusBedrock.impl().account().get() != account) {
                 BedrockFriendsService.leaveCurrent();
             } else {
-                BedrockConnectionUtil.connectNetherNet(joined.address());
+                BedrockConnectionUtil.connectNetherNet(joined.address(), parent, world.worldName());
             }
         }, client);
     }
 }
+
