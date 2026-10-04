@@ -89,7 +89,9 @@ public final class BlockConnections {
             case "south" -> dx = -1;
             case "east" -> dz = 1;
             case "west" -> dz = -1;
-            default -> { return state; }
+            default -> {
+                return state;
+            }
         }
         final int partnerX = partner.x() - position.x();
         final int partnerZ = partner.z() - position.z();

@@ -64,6 +64,7 @@ public abstract class Container {
     private final Set<Short> dragSlots = new LinkedHashSet<>();
     private BedrockItem dragCursor;
     private int dragMode = -1;
+    private boolean dragNeedsResync;
 
     public Container(final UserConnection user, final byte containerId, final ContainerType type, final TextComponent title, final BlockPosition position, final int size, final String... validBlockTags) {
         this.user = user;
@@ -228,6 +229,7 @@ public abstract class Container {
         final InventoryTracker inventory = this.user.get(InventoryTracker.class);
         final BedrockItem cursor = inventory.getHudContainer().getItem(0);
         if (stage == 0) {
+            this.dragNeedsResync = false;
             this.dragSlots.clear();
             this.dragMode = mode <= 1 && !cursor.isEmpty() && cursor.netId() != null ? mode : -1;
             this.dragCursor = cursor.copy();
@@ -245,6 +247,8 @@ public abstract class Container {
             final SlotRef slot = this.resolveJavaSlot(javaSlot);
             if (slot != null && this.isDragDestination(slot, cursor) && this.dragSlots.size() < cursor.amount()) {
                 this.dragSlots.add(javaSlot);
+            } else {
+                this.dragNeedsResync = true;
             }
             return true;
         }
@@ -290,6 +294,12 @@ public abstract class Container {
         final ItemStackRequestInfo request = new ItemStackRequestInfo(requests.nextRequestId(), actions, List.of(), TextProcessingEventOrigin.unknown);
         requests.addRequest(new InventoryRequestStorage(request, revision, context.prevCursorContainer, context.prevContainers));
         PlayerActionPacketFactory.sendBedrockInventoryRequest(this.user, new ItemStackRequestInfo[]{request});
+        if (this.dragNeedsResync) {
+            PacketFactory.sendJavaContainerSetContent(this.user, this);
+            if (!(this instanceof InventoryContainer)) {
+                PacketFactory.sendJavaContainerSetContent(this.user, inventory.getInventoryContainer());
+            }
+        }
         return true;
     }
 
