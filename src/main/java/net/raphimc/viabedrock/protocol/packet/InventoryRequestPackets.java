@@ -31,16 +31,14 @@ import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.inventory.*;
-import net.raphimc.viabedrock.protocol.model.recipe.*;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.*;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import net.raphimc.viabedrock.protocol.types.InventoryTypes;
+import net.raphimc.viabedrock.protocol.types.recipe.CraftingRecipesType;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public final class InventoryRequestPackets {
 
@@ -120,150 +118,17 @@ public final class InventoryRequestPackets {
             final CraftingDataTracker craftingDataTracker = wrapper.user().get(CraftingDataTracker.class);
             final ItemRewriter itemRewriter = wrapper.user().get(ItemRewriter.class);
 
-            final List<CraftingDataStorage> recipes = new ArrayList<>();
-            int recipeIndex = -1;
-            RecipeType recipeTypeForDiagnostics = null;
-            String recipeIdForDiagnostics = null;
             try {
-                final int craftingDataSize = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
-                for (int i = 0; i < craftingDataSize; i++) {
-                    recipeIndex = i;
-                    recipeIdForDiagnostics = null;
-                    final RecipeType recipeType = RecipeType.getByValue(wrapper.read(BedrockTypes.VAR_INT));
-                    recipeTypeForDiagnostics = recipeType;
-                    if (recipeType == null) {
-                        ViaBedrock.getPlatform().getLogger().warning("Received unknown recipe type in crafting data");
-                        wrapper.clearPacket();
-                        return;
-                    }
-                    switch (recipeType) {
-                        case SHAPELESS, USER_DATA_SHAPELESS, SHAPELESS_CHEMISTRY -> {
-                            final String recipeId = wrapper.read(BedrockTypes.STRING);
-                            recipeIdForDiagnostics = recipeId;
-                            final List<ItemDescriptor> ingredients = List.of(wrapper.read(InventoryTypes.ITEM_DESCRIPTORS));
-                            final List<BedrockItem> results = List.of(wrapper.read(itemRewriter.itemInstanceArrayType()));
-                            final UUID recipeUuid = wrapper.read(BedrockTypes.UUID);
-                            final String recipeTag = wrapper.read(BedrockTypes.STRING);
-                            final int priority = wrapper.read(BedrockTypes.VAR_INT);
-    
-                            // TODO: Sync unlocking recipes
-                            if (recipeType == RecipeType.SHAPELESS || recipeType == RecipeType.USER_DATA_SHAPELESS) {
-                                final byte unlock = wrapper.read(Types.BYTE);
-                                if (unlock == 0) {
-                                    wrapper.read(InventoryTypes.ITEM_DESCRIPTORS);
-                                }
-                            }
-    
-                            final int netId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
-    
-                            final CraftingDataStorage recipe = new CraftingDataStorage(
-                                    recipeType,
-                                    netId,
-                                    new ShapelessRecipe(recipeId, recipeUuid, recipeTag, priority, ingredients, results)
-                            );
-                            recipes.add(recipe);
-                        }
-                        case SHAPED, SHAPED_CHEMISTRY -> {
-                            final String recipeId = wrapper.read(BedrockTypes.STRING);
-                            recipeIdForDiagnostics = recipeId;
-                            final int width = wrapper.read(BedrockTypes.VAR_INT);
-                            final int height = wrapper.read(BedrockTypes.VAR_INT);
-                            final ItemDescriptor[][] ingredients = new ItemDescriptor[height][width];
-                            for (int row = 0; row < height; row++) {
-                                for (int col = 0; col < width; col++) {
-                                    ingredients[row][col] = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
-                                }
-                            }
-    
-                            final List<BedrockItem> results = List.of(wrapper.read(itemRewriter.itemInstanceArrayType()));
-                            final UUID recipeUuid = wrapper.read(BedrockTypes.UUID);
-                            final String recipeTag = wrapper.read(BedrockTypes.STRING);
-                            final int priority = wrapper.read(BedrockTypes.VAR_INT);
-                            final boolean assumeSymmetric = wrapper.read(Types.BOOLEAN);
-    
-                            // TODO: Sync unlocking recipes
-                            if (recipeType == RecipeType.SHAPED) {
-                                final byte unlock = wrapper.read(Types.BYTE);
-                                if (unlock == 0) {
-                                    wrapper.read(InventoryTypes.ITEM_DESCRIPTORS);
-                                }
-                            }
-    
-                            final int netId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
-    
-                            final CraftingDataStorage recipe = new CraftingDataStorage(
-                                    recipeType,
-                                    netId,
-                                    new ShapedRecipe(recipeId, recipeUuid, recipeTag, priority, ingredients, results, assumeSymmetric)
-                            );
-                            recipes.add(recipe);
-                        }
-                        case UNKNOWN_1, UNKNOWN_2 -> { // TODO: What is this for
-                            wrapper.read(BedrockTypes.VAR_INT);
-    
-                            if (recipeType == RecipeType.UNKNOWN_2) {
-                                wrapper.read(BedrockTypes.VAR_INT);
-                            }
-    
-                            wrapper.read(itemRewriter.itemInstanceType());
-    
-                            wrapper.read(BedrockTypes.STRING);
-                        }
-                        case MULTI -> { // TODO: What is this for
-                            wrapper.read(BedrockTypes.UUID);
-                            wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
-                        }
-                        case SMITHING_TRANSFORM, SMITHING_TRIM -> {
-                            final String recipeId = wrapper.read(BedrockTypes.STRING);
-                            recipeIdForDiagnostics = recipeId;
-                            final ItemDescriptor template = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
-                            final ItemDescriptor base = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
-                            final ItemDescriptor addition = wrapper.read(InventoryTypes.ITEM_DESCRIPTOR_TYPE);
-                            BedrockItem result = BedrockItem.empty();
-                            if (recipeType == RecipeType.SMITHING_TRANSFORM) {
-                                result = wrapper.read(itemRewriter.itemInstanceType());
-                            }
-                            final String recipeTag = wrapper.read(BedrockTypes.STRING);
-                            final int netId = wrapper.read(BedrockTypes.UNSIGNED_VAR_INT);
-    
-                            final CraftingDataStorage recipe = new CraftingDataStorage(
-                                    recipeType,
-                                    netId,
-                                    new SmithingRecipe(recipeId, UUID.nameUUIDFromBytes(recipeId.getBytes(StandardCharsets.UTF_8)), recipeTag, 0, template, base, addition, result)
-                            );
-                            recipes.add(recipe);
-                        }
-                        default -> {
-                            ViaBedrock.getPlatform().getLogger().warning("Received unsupported recipe type: " + recipeType);
-                            wrapper.clearPacket();
-                            return;
-                        }
-                    }
-                }
+                final CraftingDataStorage[] recipes = wrapper.read(new CraftingRecipesType(itemRewriter.itemInstanceType()));
+                craftingDataTracker.updateCraftingDataList(List.of(recipes));
             } catch (final Exception exception) {
-                // Recipes are optional during joining. Never publish a partially decoded list.
-                // The rest of this packet cannot be decoded safely after losing its field alignment.
                 wrapper.clearPacket();
                 ViaBedrock.getPlatform().getLogger().log(java.util.logging.Level.WARNING,
-                        "Discarding unsupported crafting data; recipe-driven crafting is unavailable for this packet"
-                                + " (index=" + recipeIndex + ", type=" + recipeTypeForDiagnostics
-                                + ", id=" + recipeIdForDiagnostics + ")", exception);
+                        "Unable to decode crafting recipes; manual crafting is unavailable", exception);
                 return;
             }
-            craftingDataTracker.updateCraftingDataList(recipes);
-
-            craftingDataTracker.sendJavaUpdateRecipes(wrapper.user());
-            // Recipe book entries still need their ingredients and categories mapped.
-
             wrapper.clearPacket();
-
-            // TODO: Potion Mixes
-
-            // TODO: Container Mixes
-
-            // TODO: Material Reducers
-
-            // TODO: Clear recipes
+            craftingDataTracker.sendJavaUpdateRecipes(wrapper.user());
         });
         protocol.registerClientbound(ClientboundBedrockPackets.ITEM_STACK_RESPONSE, null, wrapper -> {
             wrapper.cancel();
