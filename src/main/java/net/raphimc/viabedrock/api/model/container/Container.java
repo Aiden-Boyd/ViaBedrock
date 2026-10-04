@@ -199,7 +199,7 @@ public abstract class Container {
             final int slot = entry.getKey();
             final BedrockItem previous = destination.getItem(slot);
             actions.add(new ItemStackRequestAction.TakeAction(amount,
-                    new ItemStackRequestSlotInfo(this.getFullContainerName(50), (byte) 50, requestId),
+                    new ItemStackRequestSlotInfo(new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, requestId),
                     new ItemStackRequestSlotInfo(destination.getFullContainerName(slot), (byte) slot, previous.isEmpty() ? 0 : previous.netId())));
             final BedrockItem placed = output.copy();
             placed.setAmount(previous.amount() + amount);

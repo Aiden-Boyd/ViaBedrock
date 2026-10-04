@@ -97,6 +97,30 @@ class WorkstationInventoryTest {
     }
 
     @Test
+    void smithingTransformPreservesMetadataWithoutMutatingRecipeOrBase() {
+        final BedrockItem base = new BedrockItem(1);
+        final CompoundTag tag = new CompoundTag();
+        tag.putInt("Damage", 120);
+        tag.putString("CustomName", "My sword");
+        base.setTag(tag);
+        base.setNetId(15);
+        base.setCanBreak(new String[]{"minecraft:stone"});
+        final BedrockItem recipe = new BedrockItem(2);
+        final BedrockItem result = SmithingContainer.transformResult(base, recipe);
+        assertEquals(2, result.identifier());
+        assertEquals(120, result.tag().getInt("Damage"));
+        assertEquals("My sword", result.tag().getString("CustomName"));
+        assertArrayEquals(base.canBreak(), result.canBreak());
+        assertNull(result.netId());
+        result.tag().putInt("Damage", 5);
+        result.canBreak()[0] = "minecraft:dirt";
+        assertEquals(120, base.tag().getInt("Damage"));
+        assertEquals("minecraft:stone", base.canBreak()[0]);
+        assertNull(recipe.tag());
+        assertTrue(SmithingContainer.transformResult(base, BedrockItem.empty()).isEmpty());
+    }
+
+    @Test
     void crafterMetadataHandlesAbsentAndNumericMasks() {
         assertArrayEquals(new boolean[9], CrafterContainer.decodeDisabledSlots(null));
         final CompoundTag tag = new CompoundTag();

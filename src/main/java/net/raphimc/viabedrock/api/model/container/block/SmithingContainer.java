@@ -17,33 +17,24 @@
  */
 package net.raphimc.viabedrock.api.model.container.block;
 
+import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
-import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
-import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
-import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.util.PacketFactory;
-import net.raphimc.viabedrock.protocol.BedrockProtocol;
-import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
-import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
-import net.raphimc.viabedrock.protocol.storage.*;
+import net.raphimc.viabedrock.protocol.model.recipe.SmithingRecipe;
+import net.raphimc.viabedrock.protocol.storage.CraftingDataStorage;
+import net.raphimc.viabedrock.protocol.storage.CraftingDataTracker;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Map;
 
 public class SmithingContainer extends Container {
 
@@ -116,130 +107,51 @@ public class SmithingContainer extends Container {
         };
     }
 
+    public static BedrockItem transformResult(final BedrockItem base, final BedrockItem recipeResult) {
+        if (base.isEmpty() || recipeResult.isEmpty()) {
+            return BedrockItem.empty();
+        }
+        final BedrockItem result = recipeResult.copy();
+        if (base.tag() != null) {
+            final CompoundTag tag = base.tag().copy();
+            if (result.tag() != null) {
+                tag.getValue().putAll(result.tag().getValue());
+            }
+            result.setTag(tag);
+        }
+        result.setCanPlace(base.canPlace().clone());
+        result.setCanBreak(base.canBreak().clone());
+        result.setNetId(null);
+        return result;
+    }
+
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        boolean result = false;
-        if (javaSlot != 3) {
-            // Handle click first so we update the crafting grid before checking for a recipe
-            result = super.handleClick(revision, javaSlot, button, action);
+        if (action == ContainerInput.QUICK_CRAFT && (button & 3) != 2) {
+            return super.handleClick(revision, javaSlot, button, action);
         }
-
-        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-        final CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
-        final CraftingDataStorage craftingDataStorage = tracker.getRecipeData(this, "smithing_table");
-        final BedrockItem resultItem = BedrockItem.empty();
-        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
-        containerSlot.write(Types.VAR_INT, (int) this.containerId());
-        containerSlot.write(Types.VAR_INT, revision);
-        containerSlot.write(Types.SHORT, (short) 3); // Output slot
-        containerSlot.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(resultItem));
-        containerSlot.send(BedrockProtocol.class);
-
-        if (craftingDataStorage == null) {
-            // No valid recipe found
-            return result;
+        final boolean outputClick = javaSlot == 3 && action != ContainerInput.QUICK_CRAFT;
+        if (outputClick && ((action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE) || (button != 0 && button != 1))) {
+            return false;
         }
-
-        if (javaSlot != 3) {
-            // Handle click first so we update the crafting grid before checking for a recipe
-            return result;
+        final boolean handled = !outputClick && super.handleClick(revision, javaSlot, button, action);
+        final CraftingDataStorage data = this.user.get(CraftingDataTracker.class).getRecipeData(this, "smithing_table");
+        if (data == null) {
+            this.setItem(RESULT_SLOT, BedrockItem.empty());
+            PacketFactory.sendJavaContainerSetContent(this.user, this);
+            return handled;
         }
-
-        final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-
-        final List<Container> prevContainers = new ArrayList<>();
-        prevContainers.add(this.copy());
-        prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-        final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
-
-        final int bedrockSlot = this.bedrockSlot(javaSlot);
-
-        final List<ItemStackRequestAction> actions = new ArrayList<>();
-        actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), 1));
-        actions.add(new ItemStackRequestAction.ConsumeAction(
-                1,
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(TEMPLATE_SLOT),
-                        (byte) TEMPLATE_SLOT,
-                        this.getItem(TEMPLATE_SLOT).netId()
-                )
-        ));
-        actions.add(new ItemStackRequestAction.ConsumeAction(
-                1,
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(INPUT_SLOT),
-                        (byte) INPUT_SLOT,
-                        this.getItem(INPUT_SLOT).netId()
-                )
-        ));
-        actions.add(new ItemStackRequestAction.ConsumeAction(
-                1,
-                new ItemStackRequestSlotInfo(
-                        this.getFullContainerName(MATERIAL_SLOT),
-                        (byte) MATERIAL_SLOT,
-                        this.getItem(MATERIAL_SLOT).netId()
-                )
-        ));
-
-        final int nextRequestId = inventoryRequestTracker.nextRequestId();
-
-        actions.add(
-                new ItemStackRequestAction.TakeAction(
-                        1, // Total amount to take
-                        new ItemStackRequestSlotInfo(
-                                this.getFullContainerName(bedrockSlot),
-                                (byte) bedrockSlot,
-                                nextRequestId // TODO
-                        ),
-                        new ItemStackRequestSlotInfo(
-                                new FullContainerName(ContainerEnumName.CursorContainer, null),
-                                (byte) 0,
-                                0 // The stackNetworkId is not known yet
-                        )
-                )
-        );
-
-        final ItemStackRequestInfo request = new ItemStackRequestInfo(
-                nextRequestId,
-                actions,
-                List.of(),
-                TextProcessingEventOrigin.unknown
-        );
-
-        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-        PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
-
-        inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
-
-        BedrockItem templateItem = this.getItem(TEMPLATE_SLOT).copy();
-        if (templateItem.amount() - 1 != 0) {
-            templateItem.setAmount(templateItem.amount() - 1);
-        } else {
-            templateItem = BedrockItem.empty();
+        final SmithingRecipe recipe = (SmithingRecipe) data.recipe();
+        // Do not consume ingredients for trim recipes whose result metadata cannot yet be predicted.
+        final BedrockItem result = transformResult(this.getItem(INPUT_SLOT), recipe.getResult());
+        this.setItem(RESULT_SLOT, result);
+        if (!outputClick) {
+            PacketFactory.sendJavaContainerSetContent(this.user, this);
+            return handled;
         }
-        this.setItem(TEMPLATE_SLOT, templateItem);
-
-        BedrockItem inputItem = this.getItem(INPUT_SLOT).copy();
-        if (inputItem.amount() - 1 != 0) {
-            inputItem.setAmount(inputItem.amount() - 1);
-        } else {
-            inputItem = BedrockItem.empty();
-        }
-        this.setItem(INPUT_SLOT, inputItem);
-
-        BedrockItem materialItem = this.getItem(MATERIAL_SLOT).copy();
-        if (materialItem.amount() - 1 != 0) {
-            materialItem.setAmount(materialItem.amount() - 1);
-        } else {
-            materialItem = BedrockItem.empty();
-        }
-        this.setItem(MATERIAL_SLOT, materialItem);
-
-        PacketFactory.sendJavaContainerSetContent(user, this);
-
-        //TODO: Re-Update the output slot
-        return true;
+        return this.craftOutput(revision, data.networkId(), result,
+                Map.of(TEMPLATE_SLOT, recipe.getTemplate().amount(), INPUT_SLOT, recipe.getBaseIngredient().amount(),
+                        MATERIAL_SLOT, recipe.getAdditionIngredient().amount()), action == ContainerInput.QUICK_MOVE);
     }
 
 }
