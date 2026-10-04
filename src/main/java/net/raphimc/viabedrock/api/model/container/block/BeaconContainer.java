@@ -38,6 +38,7 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.protocol.storage.InventoryRequestTracker;
@@ -124,12 +125,38 @@ public class BeaconContainer extends Container {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        return this.setVirtualItems(items);
+    }
+
+    @Override
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
         // Fix magic offset
         return super.setItem(bedrockSlot - 27, item);
     }
 
+    public static boolean acceptsPayment(final String identifier) {
+        return "minecraft:emerald".equals(identifier) || "minecraft:diamond".equals(identifier)
+                || "minecraft:gold_ingot".equals(identifier) || "minecraft:iron_ingot".equals(identifier)
+                || "minecraft:netherite_ingot".equals(identifier);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int slot, final BedrockItem item) {
+        return slot == 27 && acceptsPayment(this.user.get(ItemRewriter.class)
+                .getItems().inverse().get(item.identifier())) && super.canPlaceItem(slot, item);
+    }
+
+    @Override
+    protected int slotStackLimit(final int slot, final BedrockItem item) {
+        return 1;
+    }
+
     public void updateEffects(final int primaryEffect, final int secondaryEffect) {
+        final BedrockItem paymentItem = this.getItem(27);
+        if (paymentItem.isEmpty() || paymentItem.netId() == null) {
+            return;
+        }
         final InventoryRequestTracker inventoryRequestTracker = this.user.get(InventoryRequestTracker.class);
         final InventoryTracker inventoryTracker = this.user.get(InventoryTracker.class);
 
@@ -142,8 +169,6 @@ public class BeaconContainer extends Container {
 
         final int bedrockIdPrimary = bedrockIdentifierPrimary == null ? 0 : BedrockProtocol.MAPPINGS.getBedrockEffects().get(bedrockIdentifierPrimary);
         final int bedrockIdSecondary = bedrockIdentifierSecondary == null ? 0 : BedrockProtocol.MAPPINGS.getBedrockEffects().get(bedrockIdentifierSecondary);
-
-        final BedrockItem paymentItem = this.getItem(27);
 
         final ItemStackRequestInfo requestInfo = new ItemStackRequestInfo(
                 inventoryRequestTracker.nextRequestId(),

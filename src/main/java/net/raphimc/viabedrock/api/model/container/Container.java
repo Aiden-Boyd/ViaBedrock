@@ -890,6 +890,17 @@ public abstract class Container {
         return true;
     }
 
+    protected boolean setVirtualItems(final BedrockItem[] items) {
+        if (items.length != this.size() && items.length != 54) {
+            return false;
+        }
+        for (int slot = 0; slot < this.size(); slot++) {
+            final int bedrockSlot = this.bedrockSlot(slot);
+            this.setItem(bedrockSlot, items.length == 54 ? items[bedrockSlot] : items[slot]);
+        }
+        return true;
+    }
+
     public boolean setItems(final BedrockItem[] items) {
         if (items.length != this.items.length) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Tried to set items for " + this.type + ", but items array length was not correct (" + items.length + " != " + this.items.length + ")");
@@ -984,4 +995,3 @@ public abstract class Container {
     }
 
 }
-

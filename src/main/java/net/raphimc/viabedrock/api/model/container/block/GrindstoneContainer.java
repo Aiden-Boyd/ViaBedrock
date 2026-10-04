@@ -74,6 +74,11 @@ public class GrindstoneContainer extends Container {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        return this.setVirtualItems(items);
+    }
+
+    @Override
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
         // Fix magic offset
         return switch (bedrockSlot) {

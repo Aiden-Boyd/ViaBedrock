@@ -18,7 +18,7 @@
 package net.raphimc.viabedrock.api.model.container.block;
 
 import com.viaversion.nbt.tag.CompoundTag;
-import com.viaversion.nbt.tag.ShortTag;
+import com.viaversion.nbt.tag.NumberTag;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
@@ -27,23 +27,26 @@ import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.api.chunk.BedrockBlockEntity;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
-import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
 
 public class CrafterContainer extends Container {
 
+    private final boolean[] disabledSlots;
+
     public CrafterContainer(final UserConnection user, final byte containerId, final TextComponent title, final BlockPosition position) {
         super(user, containerId, ContainerType.CRAFTER, title, position, 9, CustomBlockTags.CRAFTER);
 
-        final boolean[] disabledSlots = this.getCrafterMetadata();
+        this.disabledSlots = this.getCrafterMetadata();
         for (short i = 0; i < 9; i++) {
-            final boolean disabled = disabledSlots[i];
+            final boolean disabled = this.disabledSlots[i];
 
             final PacketWrapper setData = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_DATA, user);
             setData.write(Types.VAR_INT, (int) this.javaContainerId());
@@ -59,33 +62,31 @@ public class CrafterContainer extends Container {
     }
 
     @Override
-    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        if (javaSlot >= 0 && javaSlot <= 8) {
+    protected boolean canPlaceItem(final int slot, final BedrockItem item) {
+        return slot >= 0 && slot < 9 && !this.disabledSlots[slot] && super.canPlaceItem(slot, item);
+    }
 
-            // TODO: Minecraft wiki says it gets handled here but java currently sends a CONTAINER_SLOT_STATE_CHANGED packet which we can use instead
-
-            return true;
-        } else if (javaSlot == 45) {
-            return true;
+    public boolean setSlotEnabled(final int slot, final boolean enabled) {
+        if (slot < 0 || slot >= 9 || !this.getItem(slot).isEmpty()) {
+            return false;
         }
-        return super.handleClick(revision, javaSlot, button, action);
+        this.disabledSlots[slot] = !enabled;
+        return true;
+    }
+
+    public static boolean[] decodeDisabledSlots(final CompoundTag tag) {
+        final boolean[] disabledSlots = new boolean[9];
+        if (tag != null && tag.get("disabled_slots") instanceof NumberTag mask) {
+            for (int i = 0; i < disabledSlots.length; i++) {
+                disabledSlots[i] = (mask.asInt() & (1 << i)) != 0;
+            }
+        }
+        return disabledSlots;
     }
 
     private boolean[] getCrafterMetadata() {
-        final ChunkTracker ct = this.user.get(ChunkTracker.class);
-
-        final CompoundTag tag = ct.getBlockEntity(position).tag();
-        if (tag == null || !tag.contains("disabled_slots")) {
-            return new boolean[9];
-        }
-
-        final boolean[] disabledSlots = new boolean[9];
-        final int mask = ((ShortTag) tag.get("disabled_slots")).asInt();
-        for (int i = 0; i < 9; i++) {
-            disabledSlots[i] = (mask & (1 << i)) != 0;
-        }
-
-        return disabledSlots;
+        final BedrockBlockEntity blockEntity = this.user.get(ChunkTracker.class).getBlockEntity(this.position);
+        return decodeDisabledSlots(blockEntity != null ? blockEntity.tag() : null);
     }
 
 }

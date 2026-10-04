@@ -101,6 +101,11 @@ public class SmithingContainer extends Container {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        return this.setVirtualItems(items);
+    }
+
+    @Override
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
         return switch (bedrockSlot) {
             case TEMPLATE_SLOT -> super.setItem(0, item);

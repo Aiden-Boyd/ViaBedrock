@@ -19,7 +19,6 @@ package net.raphimc.viabedrock.protocol.types.inventory;
 
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.type.Type;
-import com.viaversion.viaversion.api.type.Types;
 import io.netty.buffer.ByteBuf;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.ComplexInventoryTransaction_Type;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
@@ -97,6 +96,15 @@ public class InventoryTransactionPacketType extends Type<BedrockInventoryTransac
         return new BedrockInventoryTransaction(legacyRequestId, List.of(legacySlots), List.of(actions), type, transactionData);
     }
 
+    public static void writeLegacyRequest(final ByteBuf buffer, final int legacyRequestId, final List<LegacySetItemSlotData> slots) {
+        BedrockTypes.VAR_INT.write(buffer, legacyRequestId);
+        final boolean hasLegacySlots = legacyRequestId < -1 && (legacyRequestId & 1) == 0;
+        buffer.writeBoolean(hasLegacySlots);
+        if (hasLegacySlots) {
+            InventoryTypes.LEGACY_SET_ITEM_SLOT_DATA.write(buffer, slots.toArray(new LegacySetItemSlotData[0]));
+        }
+    }
+
     @Override
     public void write(final ByteBuf buffer, final BedrockInventoryTransaction bedrockInventoryTransaction) {
         final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
@@ -104,11 +112,7 @@ public class InventoryTransactionPacketType extends Type<BedrockInventoryTransac
             throw new IllegalStateException("ItemRewriter not found for user " + this.user);
         }
 
-        BedrockTypes.VAR_INT.write(buffer, bedrockInventoryTransaction.legacyRequestId());
-        Types.BOOLEAN.write(buffer, bedrockInventoryTransaction.legacyRequestId() != 0);
-        if (bedrockInventoryTransaction.legacyRequestId() != 0) {
-            InventoryTypes.LEGACY_SET_ITEM_SLOT_DATA.write(buffer, bedrockInventoryTransaction.legacySlots().toArray(new LegacySetItemSlotData[0]));
-        }
+        writeLegacyRequest(buffer, bedrockInventoryTransaction.legacyRequestId(), bedrockInventoryTransaction.legacySlots());
 
         BedrockTypes.UNSIGNED_VAR_INT.write(buffer, bedrockInventoryTransaction.transactionType().getValue());
         if (bedrockInventoryTransaction.actions() != null) { //TODO: Make actions list Optional

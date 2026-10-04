@@ -182,7 +182,7 @@ public final class InventoryPackets {
 
                     final InventoryTracker inventoryTracker = wrapper.user().get(InventoryTracker.class);
                     final Container container = serverInitiated ? inventoryTracker.getCurrentContainer() : inventoryTracker.getPendingCloseContainer();
-                    if (container == null) {
+                    if (container == null || wrapper.get(Types.VAR_INT, 0) != (int) container.containerId()) {
                         wrapper.cancel();
                         return;
                     }
@@ -652,4 +652,3 @@ public final class InventoryPackets {
     }
 
 }
-

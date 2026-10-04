@@ -89,6 +89,11 @@ public class AnvilContainer extends Container {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        return this.setVirtualItems(items);
+    }
+
+    @Override
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
         return switch (bedrockSlot) {
             case 1 -> super.setItem(0, item);
@@ -101,6 +106,12 @@ public class AnvilContainer extends Container {
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 2) {
+            if (action != ContainerInput.PICKUP || (button != 0 && button != 1)
+                    || this.getItem(1).isEmpty() || this.getItem(1).netId() == null
+                    || (!this.getItem(2).isEmpty() && this.getItem(2).netId() == null)
+                    || !this.user.get(InventoryTracker.class).getHudContainer().getItem(0).isEmpty()) {
+                return false;
+            }
             final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
             final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
 
@@ -111,7 +122,9 @@ public class AnvilContainer extends Container {
             prevContainers.add(inventoryTracker.getInventoryContainer().copy());
             final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
-            final BedrockItem resultItem = this.getItem(1);
+            final BedrockItem resultItem = this.getItem(1).copy();
+            resultItem.setAmount(1);
+            resultItem.setNetId(requestId);
 
             final List<ItemStackRequestAction> actions = new ArrayList<>();
             actions.add(new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0)); //TODO: This needs more debugging
@@ -157,16 +170,14 @@ public class AnvilContainer extends Container {
                     origin
             );
 
-            this.setItem(1, BedrockItem.empty()); // Clear the input item
-            this.setItem(2, BedrockItem.empty()); // Clear the material item (TODO: May need an algo)
+            this.setItem(1, this.itemAfterRemovingAmount(this.getItem(1), 1));
+            this.setItem(2, this.itemAfterRemovingAmount(this.getItem(2), 1));
             inventoryTracker.getHudContainer().setItem(0, resultItem);
 
             inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
             PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
-        } else {
-            return false;
+            return true;
         }
-
         return super.handleClick(revision, javaSlot, button, action);
     }
 

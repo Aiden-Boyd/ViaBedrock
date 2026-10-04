@@ -93,7 +93,14 @@ public final class InventoryRequestPackets {
 
             final InventoryTracker inventoryTracker = wrapper.user().get(InventoryTracker.class);
             if (inventoryTracker.isContainerOpen() && inventoryTracker.getCurrentContainer() instanceof BeaconContainer beaconContainer) {
-                beaconContainer.updateEffects(primaryPower, secondaryPower);
+                final int selectedPrimary = primaryPower;
+                final int selectedSecondary = secondaryPower;
+                wrapper.user().get(InventoryRequestTracker.class).runInventoryAction(() -> {
+                    if (inventoryTracker.enforceContainerPermissions() && inventoryTracker.getCurrentContainer() == beaconContainer
+                            && inventoryTracker.getPendingCloseContainer() == null) {
+                        beaconContainer.updateEffects(selectedPrimary, selectedSecondary);
+                    }
+                });
             }
         });
         protocol.registerServerbound(ServerboundPackets26_3.RENAME_ITEM, null, wrapper -> {
@@ -112,7 +119,9 @@ public final class InventoryRequestPackets {
 
             final InventoryTracker inventoryTracker = wrapper.user().get(InventoryTracker.class);
             final Container container = inventoryTracker.getContainerServerbound((byte) windowId);
-            if (!(container instanceof CrafterContainer)) {
+            if (!inventoryTracker.enforceContainerPermissions() || inventoryTracker.getPendingCloseContainer() != null
+                    || !(container instanceof CrafterContainer crafter) || container.position() == null
+                    || !crafter.setSlotEnabled(slotId, state)) {
                 wrapper.cancel();
                 return;
             }
@@ -326,4 +335,3 @@ public final class InventoryRequestPackets {
     }
 
 }
-
