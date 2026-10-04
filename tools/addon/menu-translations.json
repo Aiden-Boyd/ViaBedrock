@@ -3,5 +3,10 @@
   "bedrock_menu.viafabricplus.loading_friends": "Finding joinable worlds…",
   "bedrock_menu.viafabricplus.friends_error": "Could not refresh worlds — open Xbox friends to retry",
   "bedrock_menu.viafabricplus.no_friends": "No joinable worlds — open Xbox friends",
-  "bedrock_menu.viafabricplus.manage_friends": "Join a world below, or open Xbox friends"
+  "bedrock_menu.viafabricplus.manage_friends": "Join a world below, or open Xbox friends",
+  "bedrock_menu.viafabricplus.sign_in_realms": "Sign in to Xbox to see Bedrock Realms",
+  "bedrock_menu.viafabricplus.loading_realms": "Loading Bedrock Realms…",
+  "bedrock_menu.viafabricplus.realms_error": "Could not refresh Bedrock Realms — open to retry",
+  "bedrock_menu.viafabricplus.no_realms": "No Bedrock Realms — open to accept an invite",
+  "bedrock_menu.viafabricplus.manage_realms": "Play a Realm below, or open Bedrock invitations"
 }

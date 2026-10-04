@@ -53,7 +53,9 @@
     "features.movement.MixinLocalPlayer",
     "features.movement.MixinPlayer",
     "core.integration.MixinBedrockServerSelectionList",
-    "core.integration.MixinBedrockFriendsInMultiplayer"
+    "core.integration.MixinBedrockFriendsInMultiplayer",
+    "core.integration.MixinBedrockRealmsInRealms",
+    "core.integration.MixinBedrockRealmSelectionList"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -93,6 +93,10 @@ jobs:
         run: |
           python3 ../ViaBedrock/tools/addon/inspect-menu-api.py
 
+      - name: Verify native menu integration
+        working-directory: ../viafabricplus-bedrock
+        run: python3 ../ViaBedrock/tools/addon/verify-menu-overlay.py
+
       - name: Verify custom ViaBedrock code was embedded
         run: |
           LOCAL_JAR="$HOME/.m2/repository/net/raphimc/ViaBedrock/0.0.31-SNAPSHOT/ViaBedrock-0.0.31-SNAPSHOT.jar"

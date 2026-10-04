@@ -26,6 +26,14 @@ import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService.FriendWorld;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.BedrockConnectionUtil;
 import com.viaversion.viafabricplus.screen.base.VFPScreen;
+import com.viaversion.viafabricplus.bedrock.realms.BedrockRealmsError;
+import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmsScreen;
+import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmTimelineScreen;
+import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetJsonRpcAddress;
+import com.viaversion.viafabricplus.util.network.ConnectionUtil;
+import net.raphimc.minecraftauth.extra.realms.model.RealmsJoinInformation;
+import net.raphimc.viabedrock.api.BedrockProtocolVersion;
+import org.cloudburstmc.netty.channel.nethernet.config.NetherNetAddress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -41,6 +49,55 @@ public final class BedrockMenuJoiner {
     public static boolean joinable(final FriendWorld world) {
         return (world.protocol() == 0 || world.protocol() == ProtocolConstants.BEDROCK_PROTOCOL_VERSION)
             && (world.maxPlayers() <= 0 || world.players() < world.maxPlayers());
+    }
+
+    public static void joinRealm(final Screen parent, final BedrockRealmData data) {
+        final Minecraft client = Minecraft.getInstance();
+        final BedrockAuthManager account = ViaFabricPlusBedrock.impl().account().get();
+        if (data.bedrock == null) {
+            if (account == null) {
+                ViaFabricPlusBedrock.impl().account().login();
+            } else {
+                new BedrockRealmsScreen().open(parent);
+            }
+            return;
+        }
+        if (joining || account != data.account || client.getConnection() != null) {
+            return;
+        }
+        if (data.bedrock.isExpired() || "CLOSED".equalsIgnoreCase(data.bedrock.getState()) || !data.bedrock.isCompatible()) {
+            VFPScreen.showToast(Component.translatable("bedrock_realms.viafabricplus." +
+                (data.bedrock.isExpired() ? "expired" : "CLOSED".equalsIgnoreCase(data.bedrock.getState()) ? "closed" : "incompatible")));
+            return;
+        }
+        joining = true;
+        data.service.joinWorldAsync(data.bedrock).whenCompleteAsync((server, error) -> {
+            joining = false;
+            if (client.gui.screen() != parent || ViaFabricPlusBedrock.impl().account().get() != account) {
+                return;
+            }
+            if (error == null) {
+                connectRealm(server);
+            } else if (BedrockRealmsError.timelineOptInRequired(error)) {
+                new BedrockRealmTimelineScreen(account, data.bedrock, () -> joinRealm(parent, data)).open(parent);
+            } else {
+                ViaFabricPlusBedrock.impl().logger().error("Failed to join a Bedrock Realm", error);
+                VFPScreen.showToast(BedrockRealmsError.describe(error));
+            }
+        }, client);
+    }
+
+    private static void connectRealm(final RealmsJoinInformation server) {
+        final String protocol = server.getNetworkProtocol();
+        if (RealmsJoinInformation.PROTOCOL_DEFAULT.equalsIgnoreCase(protocol)) {
+            ConnectionUtil.connect(server.getAddress(), BedrockProtocolVersion.BEDROCK_LATEST);
+        } else if (RealmsJoinInformation.PROTOCOL_NETHERNET.equalsIgnoreCase(protocol)) {
+            BedrockConnectionUtil.connectNetherNet(new NetherNetAddress(server.getAddress()));
+        } else if (RealmsJoinInformation.PROTOCOL_NETHERNET_JSONRPC.equalsIgnoreCase(protocol)) {
+            BedrockConnectionUtil.connectNetherNet(new NetherNetJsonRpcAddress(server.getAddress()));
+        } else {
+            VFPScreen.showToast(Component.translatable("bedrock_realms.viafabricplus.unsupported_protocol", protocol));
+        }
     }
 
     public static void joinFriend(final Screen parent, final FriendWorld world) {

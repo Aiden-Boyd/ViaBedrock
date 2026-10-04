@@ -31,7 +31,7 @@ public final class AccountWorldList<T> {
 
     private Object account;
     private long generation;
-    private long nextRefresh;
+    private long nextRefresh = Long.MIN_VALUE;
     private boolean loading;
     private List<T> worlds = List.of();
     private Throwable error;
@@ -45,7 +45,7 @@ public final class AccountWorldList<T> {
             this.loading = false;
             this.worlds = List.of();
             this.error = null;
-            this.nextRefresh = 0;
+            this.nextRefresh = Long.MIN_VALUE;
             changed.run();
         }
         if (account == null || this.loading || now < this.nextRefresh) {
@@ -58,7 +58,7 @@ public final class AccountWorldList<T> {
         final CompletableFuture<List<T>> future;
         try {
             future = request.get();
-        } catch (Throwable error) {
+        } catch (Exception error) {
             this.loading = false;
             this.error = error;
             changed.run();

@@ -1,0 +1,10 @@
+accessWidener v1 official
+
+accessible class net/minecraft/world/entity/EntityFluidInteraction$CurrentAccumulator
+
+# Native Bedrock Realm rows use the standard Realm list selection and Play button.
+accessible class com/mojang/realmsclient/RealmsMainScreen$Entry
+accessible class com/mojang/realmsclient/RealmsMainScreen$RealmSelectionList
+accessible class com/mojang/realmsclient/RealmsMainScreen$LayoutState
+extendable class com/mojang/realmsclient/RealmsMainScreen$ServerEntry
+accessible method com/mojang/realmsclient/RealmsMainScreen$ServerEntry <init> (Lcom/mojang/realmsclient/RealmsMainScreen;Lcom/mojang/realmsclient/dto/RealmsServer;)V
