@@ -24,6 +24,10 @@ required = {
     "com/viaversion/viaversion/api/Via.class",
     "com/viaversion/viafabricplus/ViaFabricPlusImpl.class",
     "net/raphimc/viabedrock/protocol/BedrockProtocol.class",
+    "net/lenni0451/commons/httpclient/HttpClient.class",
+    "io/jsonwebtoken/Jwts.class",
+    "io/jsonwebtoken/impl/DefaultJwtParserBuilder.class",
+    "io/jsonwebtoken/gson/io/GsonSerializer.class",
 }
 assert required <= owned_classes, f"Missing bundled translation classes: {required - owned_classes}"
 assert {"viafabricplus", "viafabricplus-bedrock"} <= mod_ids
@@ -38,21 +42,22 @@ if not launch_file.exists() or "STANDALONE_LAUNCH_EXPORTED" not in export.stdout
     print(export.stdout[-12000:] + export.stderr[-12000:])
     raise SystemExit("Could not export the Minecraft launch configuration")
 launch = json.loads(launch_file.read_text())
+# Use an allowlist: unbundled mod dependencies must never leak from Gradle.
+vanilla = {str(Path(p).resolve()) for p in launch["vanillaLibraries"]}
 classpath = []
 removed = []
 for entry in launch["classpath"]:
     path = Path(entry)
-    if path.is_dir():
-        bundled = any((path / name).is_file() for name in owned_classes)
-        bundled |= (path / "fabric.mod.json").is_file()
-    elif zipfile.is_zipfile(path):
+    allowed = str(path.resolve()) in vanilla
+    if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as archive:
-            bundled = bool(owned_classes.intersection(archive.namelist()))
-    else:
-        bundled = False
-    (removed if bundled else classpath).append(entry)
+            names = set(archive.namelist())
+            allowed |= "net/minecraft/client/main/Main.class" in names
+            allowed |= "net/fabricmc/loader/impl/launch/knot/KnotClient.class" in names
+    (classpath if allowed else removed).append(entry)
 assert any("viafabricplus-5.1.0" in Path(p).name for p in removed), "External ViaFabricPlus was not removed"
-print("Removed development outputs and external bundled libraries:", len(removed), flush=True)
+print("Removed all non-vanilla development libraries and outputs:", len(removed), flush=True)
+print("Production classpath:", [Path(p).name for p in classpath], flush=True)
 
 # Deliberately avoid Loom's dev launcher and its extra mod/classpath properties.
 jvm = [arg for arg in launch["jvmArgs"] if not arg.startswith(("-Dfabric.", "-Dloader."))]
@@ -78,6 +83,8 @@ command = [launch["java"], *jvm, "-cp", os.pathsep.join(classpath),
 process = subprocess.run(command, capture_output=True, text=True, timeout=240)
 output = process.stdout + process.stderr
 print(output[-24000:])
-if process.returncode or "BEDROCK_NATIVE_MENU_SMOKE_PASSED" not in output:
+if process.returncode or any(marker not in output for marker in (
+    "BEDROCK_NATIVE_MENU_SMOKE_PASSED", "BEDROCK_AUTH_RUNTIME_SMOKE_PASSED",
+)):
     raise SystemExit("Packaged standalone mod did not pass the Minecraft menu smoke test")
 print("BEDROCK_STANDALONE_PACKAGE_SMOKE_PASSED")

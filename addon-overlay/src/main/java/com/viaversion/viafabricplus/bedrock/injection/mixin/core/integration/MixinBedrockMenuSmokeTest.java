@@ -70,6 +70,20 @@ public abstract class MixinBedrockMenuSmokeTest {
                 new net.minecraft.client.multiplayer.PlayerInfo(client.getGameProfile(), false).getSkin() == null) {
                 throw new AssertionError("Java account skin rendering or PlayerInfo mixin did not initialize");
             }
+            // Exercise saved-account restoration and JWT providers without signing in or making requests.
+            final var httpClient = net.raphimc.minecraftauth.MinecraftAuth.createHttpClient();
+            final var auth = net.raphimc.minecraftauth.bedrock.BedrockAuthManager.create(
+                httpClient, net.raphimc.viabedrock.protocol.data.ProtocolConstants.BEDROCK_VERSION_NAME);
+            final var restored = net.raphimc.minecraftauth.bedrock.BedrockAuthManager.fromJson(
+                httpClient, net.raphimc.viabedrock.protocol.data.ProtocolConstants.BEDROCK_VERSION_NAME,
+                net.raphimc.minecraftauth.bedrock.BedrockAuthManager.toJson(auth));
+            if (restored == null) throw new AssertionError("Bedrock account restoration failed");
+            final var key = io.jsonwebtoken.Jwts.SIG.HS256.key().build();
+            final String jwt = io.jsonwebtoken.Jwts.builder().subject("offline-smoke").signWith(key).compact();
+            final String subject = io.jsonwebtoken.Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(jwt).getPayload().getSubject();
+            if (!"offline-smoke".equals(subject)) throw new AssertionError("JWT provider round trip failed");
+            ViaFabricPlusBedrock.impl().logger().info("BEDROCK_AUTH_RUNTIME_SMOKE_PASSED");
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_JAVA_SKIN_SMOKE_PASSED");
             this.viaBedrock$smokeParent = client.gui.screen();
             this.viaBedrock$smokeScreen = new JoinMultiplayerScreen(this.viaBedrock$smokeParent);

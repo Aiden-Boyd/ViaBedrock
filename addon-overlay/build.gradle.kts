@@ -8,7 +8,7 @@ plugins {
 dependencies {
     implementation(libs.viafabricplus)
     // Keep its existing nested engines intact; users install only our outer jar.
-    include(libs.viafabricplus) { isTransitive = false }
+    jarInJar(libs.viafabricplus) { isTransitive = false }
 
     jarInJar(libs.viabedrock) {
         exclude(group = "com.mojang", module = "brigadier")
@@ -51,6 +51,11 @@ if (System.getenv("VIA_BEDROCK_STANDALONE_SMOKE") == "true") {
             val launch = groovy.json.JsonOutput.toJson(mapOf(
                 "java" to javaLauncher.get().executablePath.asFile.absolutePath,
                 "classpath" to classpath.files.map { it.absolutePath },
+                "vanillaLibraries" to listOf(
+                    "minecraftLibraries", "minecraftRuntimeLibraries",
+                    "minecraftClientLibraries", "minecraftClientRuntimeLibraries",
+                    "loaderLibraries"
+                ).flatMap { configurations.getByName(it).files }.map { it.absolutePath },
                 "jvmArgs" to allJvmArgs,
                 "args" to (args ?: emptyList<String>())
             ))
