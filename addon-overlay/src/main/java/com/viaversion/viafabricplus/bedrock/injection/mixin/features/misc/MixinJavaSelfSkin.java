@@ -39,7 +39,7 @@ public abstract class MixinJavaSelfSkin {
 
     @Inject(method = "getSkin", at = @At("HEAD"), cancellable = true)
     private void useJavaAccountSkin(final CallbackInfoReturnable<PlayerSkin> cir) {
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.bedrockLatest)
+        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
                 && Minecraft.getInstance().isLocalPlayer(this.getProfile().id())) {
             final PlayerSkin skin = JavaSkinService.visibleSkin();
             if (skin != null) cir.setReturnValue(skin);

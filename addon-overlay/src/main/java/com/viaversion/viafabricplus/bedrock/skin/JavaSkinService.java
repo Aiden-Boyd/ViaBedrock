@@ -120,7 +120,7 @@ public final class JavaSkinService {
                 client.getSkinManager().get(resolvedProfile).thenAcceptAsync(loaded -> {
                     synchronized (JavaSkinService.class) {
                         if (id.equals(profileId)) {
-                            loaded.ifPresent(skin -> visibleSkin = skin);
+                            loaded.ifPresent(loadedSkin -> visibleSkin = loadedSkin);
                         }
                     }
                 }, client);
