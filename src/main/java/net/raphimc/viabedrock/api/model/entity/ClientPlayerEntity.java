@@ -121,9 +121,9 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
     public void writePlayerPositionPacketToClient(final PacketWrapper wrapper, final Set<Relative> relatives, final boolean fakeTeleport) {
-        this.pendingTeleportId = this.teleportId.getAndIncrement();
+        this.pendingTeleportId = this.teleportId.getAndIncrement() * (fakeTeleport ? -1 : 1);
 
-        wrapper.write(Types.VAR_INT, this.pendingTeleportId * (fakeTeleport ? -1 : 1)); // teleport id
+        wrapper.write(Types.VAR_INT, this.pendingTeleportId); // teleport id
         wrapper.write(Types.DOUBLE, relatives.contains(Relative.X) ? 0D : (double) this.position.x()); // x
         wrapper.write(Types.DOUBLE, relatives.contains(Relative.Y) ? 0D : (double) (this.position.y() - this.eyeOffset())); // y
         wrapper.write(Types.DOUBLE, relatives.contains(Relative.Z) ? 0D : (double) this.position.z()); // z
@@ -219,16 +219,13 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
     public void confirmTeleport(final int teleportId) {
-        if (teleportId < 0) { // Fake teleport
-            if (this.pendingTeleportId == -teleportId) {
-                this.pendingTeleportId = 0;
-                this.waitingForPositionSync = false;
-            }
-        } else {
+        if (teleportId == 0 || teleportId != this.pendingTeleportId) {
+            return;
+        }
+        this.pendingTeleportId = 0;
+        this.waitingForPositionSync = false;
+        if (teleportId > 0) {
             this.serverSideTeleportConfirmed = true;
-            if (!this.initiallySpawned) {
-                ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received teleport confirm for teleport id " + teleportId + " but player is not spawned yet");
-            }
             this.authInputData.add(PlayerAuthInputData.HandledTeleport);
         }
     }
@@ -519,6 +516,9 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
     private boolean preMove(final Position3f newPosition, final Position3f newRotation, final boolean newOnGround) {
+        if ((newPosition != null && !newPosition.isFinite()) || (newRotation != null && !newRotation.isFinite())) {
+            return false;
+        }
         final ChunkTracker chunkTracker = this.user.get(ChunkTracker.class);
 
         // Allow position packet which is sent immediately after confirming a teleport
@@ -532,7 +532,7 @@ public class ClientPlayerEntity extends PlayerEntity {
         }
         // Not spawned yet or respawning
         if (!this.initiallySpawned || this.dimensionChangeInfo != null) {
-            if (!this.position.equals(newPosition)) {
+            if (newPosition != null && !this.position.equals(newPosition)) {
                 this.sendPlayerPositionPacketToClient(Relative.NONE);
             }
             return false;
@@ -540,7 +540,7 @@ public class ClientPlayerEntity extends PlayerEntity {
         // Is in unloaded chunk
         if (chunkTracker.isInUnloadedChunkSection(this.position)) {
             this.wasInsideUnloadedChunk = true;
-            if (!this.position.equals(newPosition)) {
+            if (newPosition != null && !this.position.equals(newPosition)) {
                 this.waitingForPositionSync = true;
                 this.sendPlayerPositionPacketToClient(Relative.ROTATION);
             }
@@ -584,5 +584,3 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
 }
-
-

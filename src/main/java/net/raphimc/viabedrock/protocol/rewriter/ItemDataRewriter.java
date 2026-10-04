@@ -19,6 +19,9 @@ package net.raphimc.viabedrock.protocol.rewriter;
 
 import com.viaversion.nbt.tag.*;
 import com.viaversion.viaversion.api.connection.UserConnection;
+import com.viaversion.viaversion.api.minecraft.Holder;
+import com.viaversion.viaversion.api.minecraft.item.data.trim.ArmorTrim26_3;
+import net.raphimc.viabedrock.api.util.TextUtil;
 import com.viaversion.viaversion.api.minecraft.data.StructuredData;
 import com.viaversion.viaversion.api.minecraft.data.StructuredDataKey;
 import com.viaversion.viaversion.api.minecraft.item.Item;
@@ -43,11 +46,24 @@ public final class ItemDataRewriter {
                 javaItem.dataContainer().set(StructuredDataKey.DAMAGE, durability.asInt());
             }
 
+            if (bedrockTag.get("RepairCost") instanceof NumberTag repairCost) {
+                javaItem.dataContainer().set(StructuredDataKey.REPAIR_COST, Math.max(0, repairCost.asInt()));
+            }
+            if (bedrockTag.get("Trim") instanceof CompoundTag trim) {
+                final ArmorTrim26_3 javaTrim = translateTrim(trim, BedrockProtocol.MAPPINGS.getJavaRegistries());
+                if (javaTrim != null) {
+                    javaItem.dataContainer().set(StructuredDataKey.TRIM26_3, javaTrim);
+                }
+            }
+
             if (bedrockTag.get("map_uuid") instanceof NumberTag uuidTag) {
                 javaItem.dataContainer().set(StructuredDataKey.MAP_ID, user.get(MapTracker.class).getJavaId(uuidTag.asLong()));
             }
 
             if (bedrockTag.get("display") instanceof CompoundTag displayTag) {
+                if (displayTag.get("Name") instanceof StringTag name && !name.getValue().isEmpty()) {
+                    javaItem.dataContainer().set(StructuredDataKey.CUSTOM_NAME, TextUtil.stringToNbt(name.getValue()));
+                }
                 if (displayTag.get("Lore") instanceof ListTag<?> loreTag) {
                     // TODO: Bedrock lore might be able to contain translatable components, but for now we just ignore that
                     final Tag[] tags = loreTag.getValue().toArray(new Tag[0]);
@@ -101,6 +117,22 @@ public final class ItemDataRewriter {
             }
 
         }
+    }
+
+    public static ArmorTrim26_3 translateTrim(final CompoundTag trim, final CompoundTag registries) {
+        final String material = trim.getString("Material", "");
+        final String pattern = trim.getString("Pattern", "");
+        final int materialId = trimRegistryId(registries, "minecraft:trim_material", material);
+        final int patternId = trimRegistryId(registries, "minecraft:trim_pattern", pattern);
+        return materialId >= 0 && patternId >= 0 ? new ArmorTrim26_3(Holder.of(materialId), Holder.of(patternId)) : null;
+    }
+
+    private static int trimRegistryId(final CompoundTag registries, final String registryName, final String identifier) {
+        if (identifier.isEmpty() || !(registries.get(registryName) instanceof CompoundTag registry)) {
+            return -1;
+        }
+        final String key = identifier.contains(":") ? identifier : "minecraft:" + identifier;
+        return registry.get(key) instanceof CompoundTag entry ? RegistryUtil.getRegistryIndex(registry, entry) : -1;
     }
 
     private ItemDataRewriter() {

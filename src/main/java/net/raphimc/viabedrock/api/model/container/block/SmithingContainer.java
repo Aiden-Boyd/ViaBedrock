@@ -33,6 +33,8 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.model.recipe.SmithingRecipe;
 import net.raphimc.viabedrock.protocol.storage.CraftingDataStorage;
 import net.raphimc.viabedrock.protocol.storage.CraftingDataTracker;
+import net.raphimc.viabedrock.protocol.storage.TrimDataStorage;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 import java.util.Map;
 
@@ -142,8 +144,16 @@ public class SmithingContainer extends Container {
             return handled;
         }
         final SmithingRecipe recipe = (SmithingRecipe) data.recipe();
-        // Do not consume ingredients for trim recipes whose result metadata cannot yet be predicted.
-        final BedrockItem result = transformResult(this.getItem(INPUT_SLOT), recipe.getResult());
+        final BedrockItem result;
+        if (recipe.getResult().isEmpty()) {
+            final TrimDataStorage trims = this.user.get(TrimDataStorage.class);
+            final ItemRewriter items = this.user.get(ItemRewriter.class);
+            result = trims != null ? trims.result(this.getItem(INPUT_SLOT),
+                    items.getItems().inverse().get(this.getItem(TEMPLATE_SLOT).identifier()),
+                    items.getItems().inverse().get(this.getItem(MATERIAL_SLOT).identifier())) : BedrockItem.empty();
+        } else {
+            result = transformResult(this.getItem(INPUT_SLOT), recipe.getResult());
+        }
         this.setItem(RESULT_SLOT, result);
         if (!outputClick) {
             PacketFactory.sendJavaContainerSetContent(this.user, this);

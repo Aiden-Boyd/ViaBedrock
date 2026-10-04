@@ -530,7 +530,7 @@ public final class ClientPlayerPackets {
                 return;
             }
             final Position3f position = new Position3f((float) x, (float) y + boat.eyeOffset(), (float) z);
-            if (wrapper.user().get(ChunkTracker.class).isInUnloadedChunkSection(position)) {
+            if (!position.isFinite() || wrapper.user().get(ChunkTracker.class).isInUnloadedChunkSection(position)) {
                 PlayerActionPacketFactory.sendJavaVehicleMove(wrapper.user(), boat);
                 return;
             }
@@ -744,4 +744,3 @@ public final class ClientPlayerPackets {
     }
 
 }
-

@@ -23,6 +23,10 @@ public record Position3f(float x, float y, float z) {
 
     public static final Position3f ZERO = new Position3f(0, 0, 0);
 
+    public boolean isFinite() {
+        return Float.isFinite(this.x) && Float.isFinite(this.y) && Float.isFinite(this.z);
+    }
+
     public Position3f getRelative(final BlockFace face) {
         return new Position3f(this.x + face.modX(), this.y + face.modY(), this.z + face.modZ());
     }

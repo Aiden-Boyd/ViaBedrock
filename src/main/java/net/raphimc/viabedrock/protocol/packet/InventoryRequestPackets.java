@@ -47,6 +47,10 @@ import java.util.LinkedHashSet;
 public final class InventoryRequestPackets {
 
     public static void register(final BedrockProtocol protocol) {
+        protocol.registerClientbound(ClientboundBedrockPackets.TRIM_DATA, null, wrapper -> {
+            wrapper.cancel();
+            wrapper.user().put(TrimDataStorage.read(wrapper));
+        });
         protocol.registerServerbound(ServerboundPackets26_3.CONTAINER_BUTTON_CLICK, null, wrapper -> {
             wrapper.cancel();
             final int containerId = wrapper.read(Types.VAR_INT); // container id
