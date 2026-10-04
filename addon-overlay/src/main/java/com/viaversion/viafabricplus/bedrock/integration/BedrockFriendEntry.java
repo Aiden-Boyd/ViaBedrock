@@ -30,7 +30,6 @@ import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
-import org.lwjgl.glfw.GLFW;
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
 import net.minecraft.network.chat.Component;
 
@@ -95,7 +94,7 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
 
     @Override
     public boolean keyPressed(final KeyEvent event) {
-        if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+        if (event.isSelection()) {
             this.join();
             return true;
         }
