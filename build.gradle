@@ -111,6 +111,9 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    testLogging {
+        exceptionFormat = "full"
+    }
 }
 
 def registerToolTask(String name, String toolMainClass, String toolDescription) {
