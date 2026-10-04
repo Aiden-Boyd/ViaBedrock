@@ -69,6 +69,9 @@ public class HudContainer extends InventoryRedirectContainer {
                 || (open instanceof StonecutterContainer && (slot == 3 || slot == 50))
                 || (open instanceof EnchantmentContainer && (slot == 14 || slot == 15))) {
             open.setItem(slot, newItem);
+            if (slot == 50 && open instanceof CraftingTableContainer crafting) {
+                crafting.updateCraftingResult();
+            }
             PacketFactory.sendJavaContainerSetContent(this.user, open);
         }
         if (slot >= 28 && slot <= 31 && (open == null || open instanceof InventoryContainer)) {
@@ -81,7 +84,9 @@ public class HudContainer extends InventoryRedirectContainer {
         final List<BedrockItem> results = recipe == null ? List.of()
                 : recipe.recipe() instanceof ShapedRecipe shaped ? shaped.getResults()
                 : recipe.recipe() instanceof ShapelessRecipe shapeless ? shapeless.getResults() : List.of();
-        super.setItem(50, results.size() == 1 ? results.get(0).copy() : BedrockItem.empty());
+        // A virtual Java preview must not be forwarded as a server slot update to
+        // another open crafting menu that shares Bedrock's HUD output slot.
+        this.items[50] = results.size() == 1 ? results.get(0).copy() : BedrockItem.empty();
     }
 
     public void sendCraftingResult() {
