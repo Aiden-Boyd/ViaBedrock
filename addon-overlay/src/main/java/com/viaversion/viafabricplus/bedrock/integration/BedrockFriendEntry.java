@@ -23,7 +23,6 @@ package com.viaversion.viafabricplus.bedrock.integration;
 
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService.FriendWorld;
-import com.viaversion.viafabricplus.bedrock.screen.BedrockFriendsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
@@ -121,16 +120,8 @@ public final class BedrockFriendEntry extends ServerSelectionList.OnlineServerEn
 
     @Override
     public void join() {
-        if (this.world != null && this.available()) {
-            if (this.account != ViaFabricPlusBedrock.impl().account().get()) {
-                return;
-            }
+        if (this.available()) {
             BedrockMenuJoiner.joinFriend(this.screen, this.world);
-        } else if (ViaFabricPlusBedrock.impl().account().get() == null) {
-            ViaFabricPlusBedrock.impl().account().login();
-        } else {
-            new BedrockFriendsScreen().open(this.screen);
         }
     }
 }
-

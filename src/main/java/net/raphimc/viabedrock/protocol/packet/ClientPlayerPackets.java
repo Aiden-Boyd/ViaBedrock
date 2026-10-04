@@ -293,7 +293,28 @@ public final class ClientPlayerPackets {
                     wrapper.write(Types.BYTE, (byte) PlayerRespawnState.ClientReadyToSpawn.getValue()); // state
                     wrapper.write(BedrockTypes.UNSIGNED_VAR_LONG, clientPlayer.runtimeId()); // entity runtime id
                 }
-                case REQUEST_STATS, REQUEST_GAMERULE_VALUES -> wrapper.cancel(…276 tokens truncated… clientPlayer.setGliding(true);
+                case REQUEST_STATS, REQUEST_GAMERULE_VALUES -> wrapper.cancel();
+                default -> throw new IllegalStateException("Unhandled ClientCommandAction: " + action);
+            }
+        });
+        protocol.registerServerbound(ServerboundPackets26_3.PLAYER_COMMAND, null, wrapper -> {
+            wrapper.cancel();
+            final ClientPlayerEntity clientPlayer = wrapper.user().get(EntityTracker.class).getClientPlayer();
+            wrapper.read(Types.VAR_INT); // entity id
+            final PlayerCommandAction action = PlayerCommandAction.values()[wrapper.read(Types.VAR_INT)]; // action
+            wrapper.read(Types.VAR_INT); // data
+
+            switch (action) {
+                case START_SPRINTING -> {
+                    clientPlayer.setSprinting(true);
+                    clientPlayer.addAuthInputData(PlayerAuthInputData.StartSprinting);
+                }
+                case STOP_SPRINTING -> {
+                    clientPlayer.setSprinting(false);
+                    clientPlayer.addAuthInputData(PlayerAuthInputData.StopSprinting);
+                }
+                case START_FALL_FLYING -> {
+                    clientPlayer.setGliding(true);
                     clientPlayer.addAuthInputData(PlayerAuthInputData.StartGliding);
                 }
                 default -> throw new IllegalStateException("Unhandled PlayerCommandAction: " + action);
