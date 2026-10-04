@@ -50,6 +50,10 @@ public abstract class MixinBedrockMenuSmokeTest {
             return;
         }
         final Minecraft client = Minecraft.getInstance();
+        if (this.viaBedrock$smokeTicks % 100 == 0) {
+            ViaFabricPlusBedrock.impl().logger().info("Bedrock menu smoke phase {} screen {}",
+                this.viaBedrock$smokePhase, client.gui.screen() == null ? "null" : client.gui.screen().getClass().getName());
+        }
         if (this.viaBedrock$smokePhase == 0) {
             if (!(client.gui.screen() instanceof TitleScreen) || ViaFabricPlusBedrock.impl().account() == null) {
                 return;

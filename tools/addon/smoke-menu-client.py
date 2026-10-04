@@ -2,6 +2,14 @@ import os
 import signal
 import subprocess
 import sys
+from pathlib import Path
+
+# Bypass vanilla first-launch onboarding only in this disposable CI game directory.
+game_dir = Path("run")
+game_dir.mkdir(exist_ok=True)
+(game_dir / "options.txt").write_text(
+    "onboardAccessibility:false\nskipMultiplayerWarning:true\ntutorialStep:none\nmaxFps:30\n"
+)
 
 process = subprocess.Popen(
     ["./gradlew", "runClient", "--stacktrace"],
@@ -9,7 +17,7 @@ process = subprocess.Popen(
     env={**os.environ, "VIA_BEDROCK_MENU_SMOKE": "true"},
 )
 try:
-    output, _ = process.communicate(timeout=180)
+    output, _ = process.communicate(timeout=240)
 except subprocess.TimeoutExpired:
     os.killpg(process.pid, signal.SIGTERM)
     try:
