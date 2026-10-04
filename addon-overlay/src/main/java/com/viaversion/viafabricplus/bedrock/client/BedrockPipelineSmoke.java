@@ -22,6 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.client;
 
 import com.viaversion.viaversion.api.type.Types;
+import com.viaversion.viaversion.exception.CancelEncoderException;
 import com.viaversion.viaversion.platform.ViaChannelInitializer;
 import com.viaversion.viaversion.platform.ViaEncodeHandler;
 import io.netty.buffer.ByteBuf;
@@ -46,14 +47,18 @@ public final class BedrockPipelineSmoke {
             Types.STRING.write(handshake, "localhost");
             Types.UNSIGNED_SHORT.write(handshake, 19132);
             Types.VAR_INT.write(handshake, 2);
-            channel.writeOutbound(handshake);
+            try { channel.writeOutbound(handshake); } catch (CancelEncoderException expectedCancellation) {
+                // The Java handshake is consumed to initialize the Bedrock protocol.
+            }
             if (!user.getProtocolInfo().getPipeline().contains(BedrockProtocol.class))
                 throw new AssertionError("Java handshake did not activate the Bedrock protocol");
             final var hello = Unpooled.buffer();
             Types.VAR_INT.write(hello, 0);
             Types.STRING.write(hello, "AdapterQA");
             Types.UUID.write(hello, java.util.UUID.randomUUID());
-            channel.writeOutbound(hello);
+            try { channel.writeOutbound(hello); } catch (CancelEncoderException expectedCancellation) {
+                // Login can consume the Java packet and emit a separate Bedrock request.
+            }
             final ByteBuf settings = channel.readOutbound();
             if (settings == null) throw new AssertionError("Java login did not send Bedrock network settings");
             try {
