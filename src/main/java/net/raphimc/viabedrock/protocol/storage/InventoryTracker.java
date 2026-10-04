@@ -110,7 +110,8 @@ public class InventoryTracker extends StoredObject {
         if (containerName.name() == ContainerEnumName.ArmorContainer) {
             return this.armorContainer;
         }
-        if (containerName.name() == ContainerEnumName.CursorContainer || containerName.name() == ContainerEnumName.CraftingInputContainer) {
+        if (containerName.name() == ContainerEnumName.CursorContainer || containerName.name() == ContainerEnumName.CraftingInputContainer
+                || containerName.name() == ContainerEnumName.CreatedOutputContainer || containerName.name() == ContainerEnumName.CraftingOutputPreviewContainer) {
             return this.hudContainer;
         }
         if (containerName.name() == ContainerEnumName.DynamicContainer) {
