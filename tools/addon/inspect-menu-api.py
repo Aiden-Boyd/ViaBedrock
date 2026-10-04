@@ -12,13 +12,15 @@ for jar in root.rglob("*.jar"):
             if target not in names:
                 continue
             selected = [name[:-6].replace("/", ".") for name in names if name.endswith(".class") and (
-                name.startswith("com/mojang/realmsclient/gui/screens/RealmsMainScreen")
+                name.startswith("com/mojang/realmsclient/RealmsMainScreen")
                 or name.startswith("com/mojang/realmsclient/dto/RealmsServer")
                 or name.startswith("net/minecraft/client/gui/screens/multiplayer/ServerSelectionList")
                 or name in [
                     "net/minecraft/client/gui/screens/multiplayer/JoinMultiplayerScreen.class",
                     "net/minecraft/client/multiplayer/ServerData.class",
                     "net/minecraft/client/multiplayer/ServerList.class",
+                    "net/minecraft/client/input/KeyEvent.class",
+                    "net/minecraft/client/input/MouseButtonEvent.class",
                 ])]
         print("Minecraft menu jar:", jar, flush=True)
         subprocess.run(["javap", "-classpath", str(jar), "-private", *selected], check=True)

@@ -1,0 +1,7 @@
+{
+  "bedrock_menu.viafabricplus.sign_in": "Sign in to Xbox to see joinable Bedrock worlds",
+  "bedrock_menu.viafabricplus.loading_friends": "Finding joinable worlds…",
+  "bedrock_menu.viafabricplus.friends_error": "Could not refresh worlds — open Xbox friends to retry",
+  "bedrock_menu.viafabricplus.no_friends": "No joinable worlds — open Xbox friends",
+  "bedrock_menu.viafabricplus.manage_friends": "Join a world below, or open Xbox friends"
+}
