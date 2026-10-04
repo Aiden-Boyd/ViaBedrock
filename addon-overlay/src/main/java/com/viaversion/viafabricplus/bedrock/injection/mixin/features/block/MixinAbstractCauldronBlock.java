@@ -25,6 +25,7 @@ import com.viaversion.viafabricplus.bedrock.client.BedrockClient;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.AbstractCauldronBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -37,7 +38,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(AbstractCauldronBlock.class)
-public abstract class MixinAbstractCauldronBlock {
+public abstract class MixinAbstractCauldronBlock extends Block {
+
+    protected MixinAbstractCauldronBlock(Properties settings) { super(settings); }
 
     @Unique
     private static final VoxelShape viaFabricPlusBedrock$shape = Shapes.or(
@@ -55,12 +58,12 @@ public abstract class MixinAbstractCauldronBlock {
         }
     }
 
-    // The method is added to the block by ViaFabricPlus, so this addon can only inject into it
-    @Inject(method = "getCollisionShape", at = @At("HEAD"), cancellable = true)
-    private void changeCollisionShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context, final CallbackInfoReturnable<VoxelShape> cir) {
+    @Override
+    protected VoxelShape getCollisionShape(final BlockState state, final BlockGetter level, final BlockPos pos, final CollisionContext context) {
         if (BedrockClient.get().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
-            cir.setReturnValue(viaFabricPlusBedrock$shape);
+            return viaFabricPlusBedrock$shape;
         }
+        return super.getCollisionShape(state, level, pos, context);
     }
 
 }

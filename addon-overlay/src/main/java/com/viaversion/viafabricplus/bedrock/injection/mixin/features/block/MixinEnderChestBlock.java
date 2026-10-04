@@ -25,6 +25,7 @@ import com.viaversion.viafabricplus.bedrock.client.BedrockClient;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.EnderChestBlock;
+import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -39,7 +40,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(EnderChestBlock.class)
-public abstract class MixinEnderChestBlock {
+public abstract class MixinEnderChestBlock extends BaseEntityBlock {
+
+    protected MixinEnderChestBlock(Properties settings) { super(settings); }
 
     @Unique
     private static final VoxelShape viaFabricPlusBedrock$shape = Shapes.box(0.025, 0, 0.025, 0.975, 0.95, 0.975);
@@ -55,12 +58,12 @@ public abstract class MixinEnderChestBlock {
         }
     }
 
-    // The method is added to the block by ViaFabricPlus, so this addon can only inject into it
-    @Inject(method = "getOcclusionShape", at = @At("HEAD"), cancellable = true)
-    private void changeOcclusionShape(final BlockState state, final CallbackInfoReturnable<VoxelShape> cir) {
+    @Override
+    public VoxelShape getOcclusionShape(final BlockState state) {
         if (BedrockClient.get().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
-            cir.setReturnValue(SHAPE);
+            return SHAPE;
         }
+        return super.getOcclusionShape(state);
     }
 
 }
