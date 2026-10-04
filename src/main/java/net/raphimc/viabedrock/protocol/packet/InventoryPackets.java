@@ -602,7 +602,6 @@ public final class InventoryPackets {
         });
     }
 
-
     public static String containerTitleKey(final ContainerType type, final String blockTag, final boolean doubleChest) {
         return switch (type) {
             case WORKBENCH -> "container.crafting";

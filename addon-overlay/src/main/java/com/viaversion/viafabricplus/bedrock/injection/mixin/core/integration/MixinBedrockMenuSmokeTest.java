@@ -66,6 +66,10 @@ public abstract class MixinBedrockMenuSmokeTest {
             if (JavaSkinService.current() == null) {
                 throw new AssertionError("Java default skin did not load in the development client");
             }
+            if (JavaSkinService.visibleSkin() == null ||
+                new net.minecraft.client.multiplayer.PlayerInfo(client.getGameProfile(), false).getSkin() == null) {
+                throw new AssertionError("Java account skin rendering or PlayerInfo mixin did not initialize");
+            }
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_JAVA_SKIN_SMOKE_PASSED");
             this.viaBedrock$smokeParent = client.gui.screen();
             this.viaBedrock$smokeScreen = new JoinMultiplayerScreen(this.viaBedrock$smokeParent);
