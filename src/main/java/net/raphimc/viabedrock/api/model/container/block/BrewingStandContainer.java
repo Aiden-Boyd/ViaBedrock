@@ -26,6 +26,8 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnu
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
+import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 
 public class BrewingStandContainer extends Container {
 
@@ -36,9 +38,9 @@ public class BrewingStandContainer extends Container {
     @Override
     public FullContainerName getFullContainerName(final int slot) {
         return switch (slot) {
-            case 0 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
+            case 0 -> new FullContainerName(ContainerEnumName.BrewingStandInputContainer, null);
             case 1, 2, 3 -> new FullContainerName(ContainerEnumName.BrewingStandResultContainer, null);
-            case 4 -> new FullContainerName(ContainerEnumName.BrewingStandInputContainer, null);
+            case 4 -> new FullContainerName(ContainerEnumName.BrewingStandFuelContainer, null);
             default -> throw new IllegalArgumentException("Invalid slot for Brewing Container: " + slot);
         };
     }
@@ -63,6 +65,28 @@ public class BrewingStandContainer extends Container {
         };
     }
 
+    public static boolean acceptsItem(final int slot, final String identifier) {
+        final boolean bottle = "minecraft:potion".equals(identifier) || "minecraft:splash_potion".equals(identifier)
+                || "minecraft:lingering_potion".equals(identifier) || "minecraft:glass_bottle".equals(identifier);
+        return switch (slot) {
+            case 0 -> !bottle; // Ingredient validity is determined by the server recipes.
+            case 1, 2, 3 -> bottle;
+            case 4 -> "minecraft:blaze_powder".equals(identifier);
+            default -> false;
+        };
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int slot, final BedrockItem item) {
+        final String identifier = this.user.get(ItemRewriter.class).getItems().inverse().get(item.identifier());
+        return acceptsItem(slot, identifier) && super.canPlaceItem(slot, item);
+    }
+
+    @Override
+    protected int slotStackLimit(final int slot, final BedrockItem item) {
+        return slot >= 1 && slot <= 3 ? 1 : super.slotStackLimit(slot, item);
+    }
+
     @Override
     public short translateContainerData(final int containerData) {
         return switch (containerData) {
@@ -73,3 +97,4 @@ public class BrewingStandContainer extends Container {
     }
 
 }
+

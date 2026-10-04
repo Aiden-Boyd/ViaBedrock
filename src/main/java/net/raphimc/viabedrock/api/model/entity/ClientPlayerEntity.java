@@ -298,6 +298,7 @@ public class ClientPlayerEntity extends PlayerEntity {
         if (!abilities.mayInteract(AbilitiesIndex.Mine)) {
             this.blockBreakingInfo = null;
             this.authInputBlockActions.clear();
+            this.authInputData.remove(PlayerAuthInputData.PerformBlockActions);
             this.suppressPostBreakSwings();
         }
 
@@ -583,4 +584,5 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
 }
+
 

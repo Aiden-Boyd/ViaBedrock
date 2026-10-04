@@ -34,6 +34,7 @@ import net.raphimc.viabedrock.api.model.container.player.OffhandContainer;
 import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.AbilitiesIndex;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
@@ -167,7 +168,19 @@ public class InventoryTracker extends StoredObject {
         this.currentForm = null;
     }
 
+    public boolean enforceContainerPermissions() {
+        if (this.currentContainer != null && this.currentContainer.type() != ContainerType.INVENTORY
+                && !this.user().get(EntityTracker.class).getClientPlayer().abilities().mayInteract(AbilitiesIndex.OpenContainers)) {
+            this.forceCloseCurrentContainer();
+            return false;
+        }
+        return true;
+    }
+
     public void tick() {
+        if (!this.enforceContainerPermissions()) {
+            return;
+        }
         if (this.currentContainer != null && this.currentContainer.position() != null) {
             if (this.currentContainer.type() == ContainerType.INVENTORY) {
                 return;
@@ -255,3 +268,4 @@ public class InventoryTracker extends StoredObject {
     }
 
 }
+

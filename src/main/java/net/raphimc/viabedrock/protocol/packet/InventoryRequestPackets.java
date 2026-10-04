@@ -64,7 +64,7 @@ public final class InventoryRequestPackets {
             }
             final UserConnection user = wrapper.user();
             user.get(InventoryRequestTracker.class).runInventoryAction(() -> {
-                if (inventoryTracker.getPendingCloseContainer() != null
+                if (!inventoryTracker.enforceContainerPermissions() || inventoryTracker.getPendingCloseContainer() != null
                         || inventoryTracker.getContainerServerbound((byte) containerId) != container) {
                     return;
                 }
@@ -326,3 +326,4 @@ public final class InventoryRequestPackets {
     }
 
 }
+

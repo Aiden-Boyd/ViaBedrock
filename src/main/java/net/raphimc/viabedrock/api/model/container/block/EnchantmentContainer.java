@@ -193,10 +193,16 @@ public class EnchantmentContainer extends Container {
     }
 
     public void setEnchantData(final List<EnchantData> data) {
-        this.data = data;
+        this.data = List.copyOf(data);
 
         // Send to java client
-        for (int i = 0; i < Math.min(this.data.size(), 3); i++) {
+        for (int i = 0; i < 3; i++) {
+            PacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) 0);
+            PacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 4), (short) -1);
+            PacketFactory.sendJavaContainerProperties(this.user, this, (short) (i + 7), (short) -1);
+            if (i >= this.data.size()) {
+                continue;
+            }
             final EnchantData d = this.data.get(i);
             PacketFactory.sendJavaContainerProperties(this.user, this, (short) i, (short) d.cost());
 
@@ -221,3 +227,4 @@ public class EnchantmentContainer extends Container {
     }
 
 }
+

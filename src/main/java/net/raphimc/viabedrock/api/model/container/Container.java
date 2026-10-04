@@ -142,7 +142,7 @@ public abstract class Container {
         if (output.isEmpty() || output.amount() <= 0 || consumed.isEmpty()) {
             return false;
         }
-        int crafts = quickMove ? maxStack / output.amount() : 1;
+        int crafts = quickMove ? 255 : 1;
         for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
             final BedrockItem input = this.getItem(ingredient.getKey());
             if (ingredient.getValue() <= 0 || input.netId() == null) {
@@ -500,8 +500,8 @@ public abstract class Container {
                 clickContext.prevContainers.add(range.container().copy());
             }
         }
-        for (boolean mergePass : new boolean[]{true, false}) {
-            for (QuickMoveRange range : ranges) {
+        for (QuickMoveRange range : ranges) {
+            for (boolean mergePass : new boolean[]{true, false}) {
                 final int start = range.backwards() ? range.endJavaSlot() - 1 : range.startJavaSlot();
                 final int end = range.backwards() ? range.startJavaSlot() - 1 : range.endJavaSlot();
                 final int step = range.backwards() ? -1 : 1;
@@ -611,7 +611,7 @@ public abstract class Container {
             for (int slot = 0; slot < this.size(); slot++) {
                 final int bedrockSlot = this.bedrockSlot(slot);
                 final ContainerEnumName name = this.getFullContainerName(bedrockSlot).name();
-                if (name != ContainerEnumName.CraftingOutputPreviewContainer && name != ContainerEnumName.CreatedOutputContainer) {
+                if (name != ContainerEnumName.CraftingOutputPreviewContainer && name != ContainerEnumName.CreatedOutputContainer && name != ContainerEnumName.SmithingTableResultPreviewContainer) {
                     sources.add(new SlotRef(this, bedrockSlot));
                 }
             }
@@ -722,7 +722,7 @@ public abstract class Container {
         return switch (this.type) {
             case FURNACE, BLAST_FURNACE, SMOKER -> List.of(new QuickMoveRange(this, 0, 1, false), new QuickMoveRange(this, 1, 2, false));
             case BREWING_STAND -> {
-                yield List.of(new QuickMoveRange(this, 3, 4, false));
+                yield List.of(new QuickMoveRange(this, 0, 3, false), new QuickMoveRange(this, 4, 5, false), new QuickMoveRange(this, 3, 4, false));
             }
             case BEACON -> List.of(new QuickMoveRange(this, 0, 1, false));
             case ANVIL -> List.of(new QuickMoveRange(this, 0, 2, false));
@@ -731,7 +731,9 @@ public abstract class Container {
             case STONECUTTER -> List.of(new QuickMoveRange(this, 0, 1, false));
             case LOOM -> List.of(new QuickMoveRange(this, 0, 3, false));
             case CARTOGRAPHY -> List.of(new QuickMoveRange(this, 0, 2, false));
-            case WORKBENCH -> List.of(new QuickMoveRange(this, 1, 10, false));
+            case WORKBENCH -> source.bedrockSlot() < 9
+                    ? List.of(new QuickMoveRange(inventory, 9, 36, false))
+                    : List.of(new QuickMoveRange(inventory, 36, 45, false));
             case GRINDSTONE -> List.of(new QuickMoveRange(this, 0, 2, false));
             case CRAFTER -> List.of(new QuickMoveRange(this, 0, 9, false));
             default -> List.of(new QuickMoveRange(this, 0, this.size(), false));
@@ -837,7 +839,8 @@ public abstract class Container {
 
     protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
         final String name = this.getFullContainerName(bedrockSlot).name().name();
-        if (name.endsWith("OutputContainer") || name.equals("CraftingOutputPreviewContainer")) {
+        if (name.endsWith("OutputContainer") || name.equals("CraftingOutputPreviewContainer")
+                || name.equals("FurnaceResultContainer") || name.equals("SmithingTableResultPreviewContainer")) {
             return false;
         }
         final InventoryTracker inventory = this.user.get(InventoryTracker.class);
@@ -981,3 +984,4 @@ public abstract class Container {
     }
 
 }
+
