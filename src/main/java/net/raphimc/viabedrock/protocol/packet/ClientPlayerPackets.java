@@ -33,6 +33,7 @@ import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.model.entity.BoatEntity;
 import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.api.model.entity.Entity;
+import net.raphimc.viabedrock.api.model.entity.PlayerEntity;
 import net.raphimc.viabedrock.api.util.BitSets;
 import net.raphimc.viabedrock.api.util.EnumUtil;
 import net.raphimc.viabedrock.api.util.MathUtil;
@@ -292,28 +293,7 @@ public final class ClientPlayerPackets {
                     wrapper.write(Types.BYTE, (byte) PlayerRespawnState.ClientReadyToSpawn.getValue()); // state
                     wrapper.write(BedrockTypes.UNSIGNED_VAR_LONG, clientPlayer.runtimeId()); // entity runtime id
                 }
-                case REQUEST_STATS, REQUEST_GAMERULE_VALUES -> wrapper.cancel();
-                default -> throw new IllegalStateException("Unhandled ClientCommandAction: " + action);
-            }
-        });
-        protocol.registerServerbound(ServerboundPackets26_3.PLAYER_COMMAND, null, wrapper -> {
-            wrapper.cancel();
-            final ClientPlayerEntity clientPlayer = wrapper.user().get(EntityTracker.class).getClientPlayer();
-            wrapper.read(Types.VAR_INT); // entity id
-            final PlayerCommandAction action = PlayerCommandAction.values()[wrapper.read(Types.VAR_INT)]; // action
-            wrapper.read(Types.VAR_INT); // data
-
-            switch (action) {
-                case START_SPRINTING -> {
-                    clientPlayer.setSprinting(true);
-                    clientPlayer.addAuthInputData(PlayerAuthInputData.StartSprinting);
-                }
-                case STOP_SPRINTING -> {
-                    clientPlayer.setSprinting(false);
-                    clientPlayer.addAuthInputData(PlayerAuthInputData.StopSprinting);
-                }
-                case START_FALL_FLYING -> {
-                    clientPlayer.setGliding(true);
+                case REQUEST_STATS, REQUEST_GAMERULE_VALUES -> wrapper.cancel(…276 tokens truncated… clientPlayer.setGliding(true);
                     clientPlayer.addAuthInputData(PlayerAuthInputData.StartGliding);
                 }
                 default -> throw new IllegalStateException("Unhandled PlayerCommandAction: " + action);
@@ -344,7 +324,7 @@ public final class ClientPlayerPackets {
             switch (action) {
                 case START_DESTROY_BLOCK -> {
                     clientPlayer.resumeBlockBreakingSwings();
-                    clientPlayer.sendSwingPacketToServer();
+                    clientPlayer.sendSwingPacketToServer(ActorSwingSource.Mine);
                     clientPlayer.cancelNextSwingPacket();
 
                     if (clientPlayer.javaGameMode() == GameMode.CREATIVE) {
@@ -435,7 +415,7 @@ public final class ClientPlayerPackets {
             final int entityId = wrapper.read(Types.VAR_INT); // entity id
             final Entity entity = entityTracker.getEntityByJid(entityId);
             if (entity == null || !entityTracker.getClientPlayer().abilities().mayInteract(
-                    entity instanceof net.raphimc.viabedrock.api.model.entity.PlayerEntity ? AbilitiesIndex.AttackPlayers : AbilitiesIndex.AttackMobs)) {
+                    entity instanceof PlayerEntity ? AbilitiesIndex.AttackPlayers : AbilitiesIndex.AttackMobs)) {
                 entityTracker.getClientPlayer().cancelNextSwingPacket();
                 wrapper.cancel();
                 return;
@@ -726,7 +706,7 @@ public final class ClientPlayerPackets {
             wrapper.write(Types.UNSIGNED_BYTE, (short) AnimatePacketPayload_Action.Swing.getValue()); // action
             wrapper.write(BedrockTypes.UNSIGNED_VAR_LONG, clientPlayer.runtimeId()); // entity runtime id
             wrapper.write(BedrockTypes.FLOAT_LE, 0F); // data
-            wrapper.write(BedrockTypes.OPTIONAL_STRING, ActorSwingSource.Attack.name().toLowerCase(Locale.ROOT)); // swing source // TODO: 1.21.130
+            wrapper.write(BedrockTypes.OPTIONAL_STRING, (clientPlayer.blockBreakingInfo() != null ? ActorSwingSource.Mine : ActorSwingSource.Attack).name().toLowerCase(Locale.ROOT)); // swing source
 
             if (clientPlayer.blockBreakingInfo() != null) {
                 if (!gameSession.isBlockBreakingServerAuthoritative()) {

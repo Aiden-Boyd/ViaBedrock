@@ -60,5 +60,6 @@ final class PlayerAuthInputBlockActionsTest {
             new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CreativeDestroyBlock, new BlockPosition(0, 0, 0), 0)
         )));
     }
+
 }
 

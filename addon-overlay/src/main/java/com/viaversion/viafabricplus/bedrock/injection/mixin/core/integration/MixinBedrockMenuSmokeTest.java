@@ -84,6 +84,11 @@ public abstract class MixinBedrockMenuSmokeTest {
             final String subject = io.jsonwebtoken.Jwts.parser().verifyWith(key).build()
                 .parseSignedClaims(jwt).getPayload().getSubject();
             if (!"offline-smoke".equals(subject)) throw new AssertionError("JWT provider round trip failed");
+            try {
+                Class.forName("net.minecraft.client.multiplayer.MultiPlayerGameMode");
+            } catch (ClassNotFoundException exception) {
+                throw new AssertionError("Client permission mixin target failed to load", exception);
+            }
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_AUTH_RUNTIME_SMOKE_PASSED");
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_JAVA_SKIN_SMOKE_PASSED");
             this.viaBedrock$smokeParent = client.gui.screen();
@@ -100,6 +105,14 @@ public abstract class MixinBedrockMenuSmokeTest {
             if (++this.viaBedrock$smokeWait < 10) {
                 return;
             }
+            this.viaBedrock$smokeScreen = new com.viaversion.viafabricplus.bedrock.screen.BedrockFriendConnectScreen(this.viaBedrock$smokeParent, "Menu QA World");
+            client.gui.setScreen(this.viaBedrock$smokeScreen);
+            this.viaBedrock$smokeWait = 0;
+            this.viaBedrock$smokePhase = 20;
+        } else if (this.viaBedrock$smokePhase == 20) {
+            if (++this.viaBedrock$smokeWait < 10) return;
+            this.viaBedrock$smokeScreen.onClose();
+            if (client.gui.screen() != this.viaBedrock$smokeParent) throw new AssertionError("Cancelling friend authorization lost the parent screen");
             this.viaBedrock$smokeScreen = new RealmsMainScreen(this.viaBedrock$smokeParent);
             client.gui.setScreen(this.viaBedrock$smokeScreen);
             this.viaBedrock$smokePhase = 3;
@@ -132,3 +145,4 @@ public abstract class MixinBedrockMenuSmokeTest {
         }
     }
 }
+

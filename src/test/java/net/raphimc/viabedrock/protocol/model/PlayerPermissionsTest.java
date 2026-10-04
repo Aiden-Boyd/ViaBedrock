@@ -33,7 +33,7 @@ final class PlayerPermissionsTest {
     void visitorCannotInteractEvenWhenFallbackAbilitiesArePermissive() {
         final var visitor = player(PlayerPermissionLevel.Visitor);
         for (var ability : new AbilitiesIndex[]{AbilitiesIndex.Build, AbilitiesIndex.Mine, AbilitiesIndex.OpenContainers,
-                AbilitiesIndex.DoorsAndSwitches, AbilitiesIndex.AttackPlayers, AbilitiesIndex.AttackMobs}) {
+            AbilitiesIndex.DoorsAndSwitches, AbilitiesIndex.AttackPlayers, AbilitiesIndex.AttackMobs}) {
             assertFalse(visitor.mayInteract(ability), ability.name());
         }
     }
@@ -80,4 +80,5 @@ final class PlayerPermissionsTest {
     private static PlayerAbilities player(final PlayerPermissionLevel role) {
         return new PlayerAbilities(1, (byte) role.getValue(), (byte) 0);
     }
+
 }
