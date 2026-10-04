@@ -312,7 +312,7 @@ public class ItemRewriter extends StoredObject {
         }
 
         final CompoundTag item = BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier);
-        return item.getInt("maxStackSize", 64);
+        return item != null ? Math.max(1, item.getInt("maxStackSize", 64)) : 64;
     }
 
     public BiMap<String, Integer> getItems() {
