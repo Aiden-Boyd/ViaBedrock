@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "viafabricplus-bedrock",
+  "version": "${version}",
+  "name": "Bedrock Multiplayer",
+  "description": "${description}",
+  "authors": [
+    {
+      "name": "Florian Reuth (EnZaXD)",
+      "contact": {
+        "email": "git@florianreuth.de",
+        "homepage": "https://github.com/florianreuth"
+      }
+    }
+  ],
+  "contributors": [
+    {
+      "name": "GitHub contributors",
+      "contact": {
+        "homepage": "https://github.com/florianreuth/viafabricplus-bedrock/graphs/contributors"
+      }
+    }
+  ],
+  "contact": {
+    "sources": "https://github.com/Aiden-Boyd/ViaBedrock",
+    "issues": "https://github.com/Aiden-Boyd/ViaBedrock/issues"
+  },
+  "license": "GPL-v3",
+  "icon": "assets/viafabricplus-bedrock/icon.png",
+  "environment": "client",
+  "entrypoints": {},
+  "mixins": [
+    "viabedrock-client.mixins.json",
+    "viafabricplus-bedrock.mixins.json"
+  ],
+  "accessWidener": "viafabricplus-bedrock.accesswidener",
+  "depends": {
+    "minecraft": "${mcVersion}",
+    "java": ">=25",
+    "fabricloader": ">=0.19.5"
+  }
+}

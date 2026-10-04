@@ -26,7 +26,7 @@ import com.mojang.realmsclient.dto.RealmsServer;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.integration.*;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockRealmDiscovery.World;
-import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmsScreen;
+import com.viaversion.viafabricplus.bedrock.screen.BedrockSettingsScreen;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -155,7 +155,7 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, Be
     private void preventJavaRealmActions(final RealmsServer server, final CallbackInfo ci) {
         if (server instanceof BedrockRealmData) {
             ci.cancel();
-            new BedrockRealmsScreen().open((Screen) (Object) this);
+            Minecraft.getInstance().gui.setScreen(new BedrockSettingsScreen((Screen) (Object) this));
         }
     }
 

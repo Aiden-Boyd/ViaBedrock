@@ -21,7 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
-import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.client.BedrockClient;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.InteractionHand;
@@ -47,8 +47,8 @@ public abstract class MixinBedrockPermissions {
 
     @Unique
     private static ClientPlayerEntity viaBedrock$player() {
-        if (!BedrockProtocolVersion.BEDROCK_LATEST.equals(ViaFabricPlus.api().targetVersion())) return null;
-        final var connection = ViaFabricPlus.api().userConnection();
+        if (!BedrockProtocolVersion.BEDROCK_LATEST.equals(BedrockClient.get().targetVersion())) return null;
+        final var connection = BedrockClient.get().userConnection();
         if (connection == null || connection.get(EntityTracker.class) == null) return null;
         return connection.get(EntityTracker.class).getClientPlayer();
     }
@@ -57,7 +57,7 @@ public abstract class MixinBedrockPermissions {
     private void checkMining(final CallbackInfoReturnable<Boolean> cir) {
         final var player = viaBedrock$player();
         if (player != null && (!player.abilities().mayInteract(AbilitiesIndex.Mine)
-                || ViaFabricPlus.api().userConnection().get(GameSessionStorage.class).isImmutableWorld())) {
+                || BedrockClient.get().userConnection().get(GameSessionStorage.class).isImmutableWorld())) {
             cir.setReturnValue(false);
         }
     }
@@ -76,7 +76,7 @@ public abstract class MixinBedrockPermissions {
                                final CallbackInfoReturnable<InteractionResult> cir) {
         final var bedrockPlayer = viaBedrock$player();
         if (bedrockPlayer == null) return;
-        final var connection = ViaFabricPlus.api().userConnection();
+        final var connection = BedrockClient.get().userConnection();
         final var chunks = connection.get(ChunkTracker.class);
         final var position = new com.viaversion.viaversion.api.minecraft.BlockPosition(hit.getBlockPos().getX(), hit.getBlockPos().getY(), hit.getBlockPos().getZ());
         final var state = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(chunks.getJavaBlockState(position));

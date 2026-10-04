@@ -21,7 +21,7 @@
 
 package com.viaversion.viafabricplus.bedrock.injection.mixin.features.misc;
 
-import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.client.BedrockClient;
 import com.viaversion.viafabricplus.bedrock.skin.JavaSkinService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -40,7 +40,7 @@ public abstract class MixinJavaSelfSkin {
     @Inject(method = "getSkin", at = @At("HEAD"), cancellable = true)
     private void useJavaAccountSkin(final CallbackInfoReturnable<PlayerSkin> cir) {
         final Minecraft client = Minecraft.getInstance();
-        if (ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
+        if (BedrockClient.get().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)
                 && client.player != null && client.player.getUUID().equals(this.getProfile().id())) {
             final PlayerSkin skin = JavaSkinService.visibleSkin();
             if (skin != null) cir.setReturnValue(skin);

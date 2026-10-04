@@ -21,7 +21,7 @@ file).
 
 For this fork, install Fabric Loader for Minecraft **26.3** with Java **25**, then put the `viabedrock-standalone-*.jar` from the [Build Standalone Bedrock Fabric Mod workflow](https://github.com/Aiden-Boyd/ViaBedrock/actions/workflows/build-vfp-bedrock-test-addon.yml) into your mods folder. No separate ViaVersion, ViaFabricPlus, or Bedrock addon jar is required. Replace the previous custom Bedrock addon when updating.
 
-The jar bundles ViaFabricPlus and its translation engines internally, together with this fork's ViaBedrock code and client integration. The source still uses the ViaVersion API. Native friends and Realms listings use the Xbox account configured in the bundled Bedrock settings.
+The jar includes the ViaVersion protocol engine, this fork's ViaBedrock code, required Bedrock authentication/transports, and selected client bridge components. It does not include the ViaFabricPlus mod, API, menus, ViaBackwards, ViaLegacy, or ViaAprilFools. Java servers use Minecraft's native pipeline. Choose Java or Bedrock on the Add Server and Direct Connect screens; the Bedrock button on Multiplayer opens Microsoft account settings. Friends and Realms appear in the native lists. Visitor and custom interaction permissions follow the server's abilities.
 
 CI checks the embedded translation classes and launches the packaged mod in an empty game directory with external engine libraries and development mod outputs removed. Authenticated server/Realm gameplay still needs live QA.
 
@@ -84,3 +84,8 @@ ViaBedrock would not have been possible without the following projects:
 - [wiki.bedrock.dev](https://wiki.bedrock.dev): Documentation of various technical aspects of Bedrock Edition
 
 Additionally ViaBedrock uses assets and data dumps from other projects: See the `Data Asset Sources.md` file for more information.
+
+
+### Building the client adapter
+
+The complete client sources are in `addon-overlay`; selected bridge components retain their original GPL notices. See `THIRD_PARTY_NOTICES.md` for provenance. The workflow publishes this core to Maven Local, checks out the pinned upstream addon build scaffolding, and runs `tools/addon/apply-menu-overlay.py` from that checkout before `./gradlew clean build`. It then tests both a development client and the actual packaged jar in an empty game directory. No ViaFabricPlus mod is required for the build or runtime.

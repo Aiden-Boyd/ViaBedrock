@@ -1,0 +1,29 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.viaversion.viafabricplus.bedrock.client.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "priority": 1000,
+  "client": [
+    "MixinMain",
+    "MixinBridgeConnection",
+    "MixinMultiplayerSettings",
+    "MixinServerData",
+    "MixinLocalSampleLogger",
+    "MixinBridgeConnectScreen",
+    "MixinEditionManageServerScreen",
+    "MixinEditServer",
+    "MixinMinecraft",
+    "MixinServerStatusResponse",
+    "MixinBridgeChannel",
+    "MixinConnectStart",
+    "MixinServerStatusPinger",
+    "MixinEditionDirectJoinServerScreen"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "mixinextras": {
+    "minVersion": "0.5.3"
+  }
+}

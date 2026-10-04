@@ -24,10 +24,10 @@ package com.viaversion.viafabricplus.bedrock.injection.mixin.core.connection;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.viaversion.viafabricplus.ViaFabricPlus;
+import com.viaversion.viafabricplus.bedrock.client.BedrockClient;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.injection.access.IEventLoopGroupHolder;
-import com.viaversion.viafabricplus.injection.access.core.IConnection;
+import com.viaversion.viafabricplus.bedrock.client.access.IConnection;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import java.io.IOException;
 import java.security.KeyPair;
@@ -62,7 +62,7 @@ public abstract class MixinConnectScreen_1 {
 
     @Inject(method = "run", at = @At(value = "INVOKE", target = "Lio/netty/channel/ChannelFuture;syncUninterruptibly()Lio/netty/channel/ChannelFuture;", remap = false, shift = At.Shift.AFTER))
     private void setupBedrockAccount(final CallbackInfo ci, @Local final Connection clientConnection) throws IOException {
-        if (!ViaFabricPlus.api().targetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
+        if (!((IConnection) clientConnection).viaFabricPlus$getTargetVersion().equals(BedrockProtocolVersion.BEDROCK_LATEST)) {
             return;
         }
 
@@ -81,3 +81,4 @@ public abstract class MixinConnectScreen_1 {
     }
 
 }
+

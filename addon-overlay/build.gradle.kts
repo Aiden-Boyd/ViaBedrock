@@ -6,9 +6,12 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.viafabricplus)
-    // Keep its existing nested engines intact; users install only our outer jar.
-    jarInJar(libs.viafabricplus) { isTransitive = false }
+    // Internal protocol engine only: no ViaFabricPlus mod, API, UI, or legacy engines.
+    jarInJar("com.viaversion:viaversion-common:5.12.0") {
+        exclude(group = "com.google.guava")
+        exclude(group = "com.google.code.gson")
+        exclude(group = "io.netty")
+    }
 
     jarInJar(libs.viabedrock) {
         exclude(group = "com.mojang", module = "brigadier")
@@ -65,3 +68,4 @@ if (System.getenv("VIA_BEDROCK_STANDALONE_SMOKE") == "true") {
         }
     }
 }
+

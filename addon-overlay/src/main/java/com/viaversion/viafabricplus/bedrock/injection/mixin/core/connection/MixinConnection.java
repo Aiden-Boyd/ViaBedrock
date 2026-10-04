@@ -35,7 +35,7 @@ import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNet
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetJsonRpcAddress;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetLanAddress;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.BedrockRakNetStatusProtocol;
-import com.viaversion.viafabricplus.injection.access.core.IConnection;
+import com.viaversion.viafabricplus.bedrock.client.access.IConnection;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import org.cloudburstmc.netty.channel.nethernet.NetherNetChannelFactory;
@@ -201,3 +201,4 @@ public abstract class MixinConnection extends SimpleChannelInboundHandler<Packet
     }
 
 }
+

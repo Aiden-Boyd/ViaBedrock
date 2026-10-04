@@ -91,7 +91,29 @@ public abstract class MixinBedrockMenuSmokeTest {
             }
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_AUTH_RUNTIME_SMOKE_PASSED");
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_JAVA_SKIN_SMOKE_PASSED");
+            com.viaversion.viafabricplus.bedrock.client.BedrockClient.get().awaitReady();
+            com.viaversion.viafabricplus.bedrock.client.BedrockPipelineSmoke.run();
+            final var data = new net.minecraft.client.multiplayer.ServerData("Adapter QA", "localhost", net.minecraft.client.multiplayer.ServerData.Type.OTHER);
+            ((com.viaversion.viafabricplus.bedrock.client.access.IServerData) data).viaFabricPlus$forceVersion(net.raphimc.viabedrock.api.BedrockProtocolVersion.BEDROCK_LATEST);
+            final var saved = net.minecraft.client.multiplayer.ServerData.read(data.write());
+            if (!net.raphimc.viabedrock.api.BedrockProtocolVersion.BEDROCK_LATEST.equals(((com.viaversion.viafabricplus.bedrock.client.access.IServerData) saved).viaFabricPlus$forcedVersion()))
+                throw new AssertionError("Saved server lost its Bedrock edition");
+            ViaFabricPlusBedrock.impl().logger().info("BEDROCK_COMPONENT_PIPELINE_SMOKE_PASSED");
+            if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("viafabricplus") || net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("viafabricplus-api"))
+                throw new AssertionError("The standalone build must not load the ViaFabricPlus mod or API");
+            try {
+                Class.forName("net.minecraft.client.gui.screens.ManageServerScreen");
+                Class.forName("net.minecraft.client.gui.screens.DirectJoinServerScreen");
+            } catch (ClassNotFoundException exception) { throw new AssertionError(exception); }
             this.viaBedrock$smokeParent = client.gui.screen();
+            this.viaBedrock$smokeScreen = new com.viaversion.viafabricplus.bedrock.screen.BedrockSettingsScreen(this.viaBedrock$smokeParent);
+            client.gui.setScreen(this.viaBedrock$smokeScreen);
+            this.viaBedrock$smokeWait = 0;
+            this.viaBedrock$smokePhase = 21;
+        } else if (this.viaBedrock$smokePhase == 21) {
+            if (++this.viaBedrock$smokeWait < 10) return;
+            this.viaBedrock$smokeScreen.onClose();
+            if (client.gui.screen() != this.viaBedrock$smokeParent) throw new AssertionError("Bedrock settings lost its parent screen");
             this.viaBedrock$smokeScreen = new JoinMultiplayerScreen(this.viaBedrock$smokeParent);
             client.gui.setScreen(this.viaBedrock$smokeScreen);
             this.viaBedrock$smokePhase = 1;

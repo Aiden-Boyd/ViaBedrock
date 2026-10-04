@@ -22,7 +22,7 @@
 package com.viaversion.viafabricplus.bedrock.protocoltranslator.network;
 
 import com.viaversion.viafabricplus.bedrock.injection.access.IServerAddress;
-import com.viaversion.viafabricplus.injection.access.core.IServerData;
+import com.viaversion.viafabricplus.bedrock.client.access.IServerData;
 import java.net.SocketAddress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;

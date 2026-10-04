@@ -22,7 +22,7 @@ def inspect(data):
 inspect(jar.read_bytes())
 required = {
     "com/viaversion/viaversion/api/Via.class",
-    "com/viaversion/viafabricplus/ViaFabricPlusImpl.class",
+    "com/viaversion/viafabricplus/bedrock/client/BedrockClient.class",
     "net/raphimc/viabedrock/protocol/BedrockProtocol.class",
     "net/lenni0451/commons/httpclient/HttpClient.class",
     "io/jsonwebtoken/Jwts.class",
@@ -30,7 +30,10 @@ required = {
     "io/jsonwebtoken/gson/io/GsonSerializer.class",
 }
 assert required <= owned_classes, f"Missing bundled translation classes: {required - owned_classes}"
-assert {"viafabricplus", "viafabricplus-bedrock"} <= mod_ids
+assert "viafabricplus-bedrock" in mod_ids
+assert not {"viafabricplus", "viafabricplus-api"} & mod_ids
+for name in owned_classes:
+    assert not name.startswith(("com/viaversion/viafabricplus/screen/", "com/viaversion/viafabricplus/api/", "com/viaversion/viabackwards/", "net/raphimc/vialegacy/", "com/viaversion/viaaprilfools/")), name
 print("Bundled modules:", ", ".join(sorted(mod_ids)), flush=True)
 
 export = subprocess.run(
@@ -55,7 +58,7 @@ for entry in launch["classpath"]:
             allowed |= "net/minecraft/client/main/Main.class" in names
             allowed |= "net/fabricmc/loader/impl/launch/knot/KnotClient.class" in names
     (classpath if allowed else removed).append(entry)
-assert any("viafabricplus-5.1.0" in Path(p).name for p in removed), "External ViaFabricPlus was not removed"
+assert not any("viafabricplus-5.1.0" in Path(p).name for p in launch["classpath"]), "ViaFabricPlus leaked into development dependencies"
 print("Removed all non-vanilla development libraries and outputs:", len(removed), flush=True)
 print("Production classpath:", [Path(p).name for p in classpath], flush=True)
 
@@ -88,3 +91,6 @@ if process.returncode or any(marker not in output for marker in (
 )):
     raise SystemExit("Packaged standalone mod did not pass the Minecraft menu smoke test")
 print("BEDROCK_STANDALONE_PACKAGE_SMOKE_PASSED")
+
+
+assert "BEDROCK_COMPONENT_PIPELINE_SMOKE_PASSED" in output, "Standalone protocol pipeline test did not run"

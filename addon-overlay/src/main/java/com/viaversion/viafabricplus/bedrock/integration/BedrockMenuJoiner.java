@@ -25,12 +25,11 @@ import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService.FriendWorld;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.BedrockConnectionUtil;
-import com.viaversion.viafabricplus.screen.base.VFPScreen;
+import com.viaversion.viafabricplus.bedrock.screen.base.BedrockScreen;
 import com.viaversion.viafabricplus.bedrock.realms.BedrockRealmsError;
-import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmsScreen;
 import com.viaversion.viafabricplus.bedrock.screen.BedrockRealmTimelineScreen;
 import com.viaversion.viafabricplus.bedrock.protocoltranslator.network.NetherNetJsonRpcAddress;
-import com.viaversion.viafabricplus.util.network.ConnectionUtil;
+import com.viaversion.viafabricplus.bedrock.client.ConnectionUtil;
 import net.raphimc.minecraftauth.extra.realms.model.RealmsJoinInformation;
 import net.raphimc.viabedrock.api.BedrockProtocolVersion;
 import org.cloudburstmc.netty.channel.nethernet.config.NetherNetAddress;
@@ -62,7 +61,7 @@ public final class BedrockMenuJoiner {
             if (account == null) {
                 ViaFabricPlusBedrock.impl().account().login();
             } else {
-                new BedrockRealmsScreen().open(parent);
+                client.gui.setScreen(new com.mojang.realmsclient.RealmsMainScreen(parent));
             }
             return;
         }
@@ -70,7 +69,7 @@ public final class BedrockMenuJoiner {
             return;
         }
         if (data.bedrock.isExpired() || "CLOSED".equalsIgnoreCase(data.bedrock.getState()) || !data.bedrock.isCompatible()) {
-            VFPScreen.showToast(Component.translatable("bedrock_realms.viafabricplus." +
+            BedrockScreen.showToast(Component.translatable("bedrock_realms.viafabricplus." +
                 (data.bedrock.isExpired() ? "expired" : "CLOSED".equalsIgnoreCase(data.bedrock.getState()) ? "closed" : "incompatible")));
             return;
         }
@@ -86,7 +85,7 @@ public final class BedrockMenuJoiner {
                 new BedrockRealmTimelineScreen(account, data.bedrock, () -> joinRealm(parent, data)).open(parent);
             } else {
                 ViaFabricPlusBedrock.impl().logger().error("Failed to join a Bedrock Realm", error);
-                VFPScreen.showToast(BedrockRealmsError.describe(error));
+                BedrockScreen.showToast(BedrockRealmsError.describe(error));
             }
         }, client);
     }
@@ -100,7 +99,7 @@ public final class BedrockMenuJoiner {
         } else if (RealmsJoinInformation.PROTOCOL_NETHERNET_JSONRPC.equalsIgnoreCase(protocol)) {
             BedrockConnectionUtil.connectNetherNet(new NetherNetJsonRpcAddress(server.getAddress()));
         } else {
-            VFPScreen.showToast(Component.translatable("bedrock_realms.viafabricplus.unsupported_protocol", protocol));
+            BedrockScreen.showToast(Component.translatable("bedrock_realms.viafabricplus.unsupported_protocol", protocol));
         }
     }
 
@@ -111,7 +110,7 @@ public final class BedrockMenuJoiner {
             return;
         }
         if (!joinable(world)) {
-            VFPScreen.showToast(Component.translatable("bedrock_friends.viafabricplus.incompatible"));
+            BedrockScreen.showToast(Component.translatable("bedrock_friends.viafabricplus.incompatible"));
             return;
         }
         joining = true;
@@ -123,7 +122,7 @@ public final class BedrockMenuJoiner {
                 ViaFabricPlusBedrock.impl().logger().error("Failed to join a Bedrock friend's world", error);
                 if (client.gui.screen() == progress) {
                     client.gui.setScreen(parent);
-                    VFPScreen.showToast(Component.translatable("base.viafabricplus.something_went_wrong"));
+                    BedrockScreen.showToast(Component.translatable("base.viafabricplus.something_went_wrong"));
                 }
             } else if (client.gui.screen() != progress || ViaFabricPlusBedrock.impl().account().get() != account) {
                 BedrockFriendsService.leaveCurrent();
