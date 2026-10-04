@@ -38,11 +38,8 @@ public class ItemStackResponseType extends Type<ItemStackResponseInfo> {
         final ItemStackNetResult result = ItemStackNetResult.getByValue(buffer.readByte());
         final int requestId = BedrockTypes.VAR_INT.read(buffer);
 
-        if (result != ItemStackNetResult.Success) {
-            return new ItemStackResponseInfo(result, requestId, null);
-        }
-
-        final List<ItemStackResponseContainerInfo> containers = List.of(InventoryTypes.ITEM_STACK_RESPONSE_CONTAINERS.read(buffer));
+        final List<ItemStackResponseContainerInfo> containers = buffer.readBoolean()
+                ? List.of(InventoryTypes.ITEM_STACK_RESPONSE_CONTAINERS.read(buffer)) : List.of();
 
         return new ItemStackResponseInfo(result, requestId, containers);
     }
@@ -52,11 +49,11 @@ public class ItemStackResponseType extends Type<ItemStackResponseInfo> {
         buffer.writeByte(value.result().getValue());
         BedrockTypes.VAR_INT.write(buffer, value.requestId());
 
-        if (value.result() != ItemStackNetResult.Success) {
-            return;
+        final boolean hasContainers = value.containers() != null && !value.containers().isEmpty();
+        buffer.writeBoolean(hasContainers);
+        if (hasContainers) {
+            InventoryTypes.ITEM_STACK_RESPONSE_CONTAINERS.write(buffer, value.containers().toArray(new ItemStackResponseContainerInfo[0]));
         }
-
-        InventoryTypes.ITEM_STACK_RESPONSE_CONTAINERS.write(buffer, value.containers().toArray(new ItemStackResponseContainerInfo[0]));
     }
 
 }
