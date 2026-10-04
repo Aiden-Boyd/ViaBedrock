@@ -83,6 +83,10 @@ public final class ClientPlayerPackets {
     };
 
     public static void register(final BedrockProtocol protocol) {
+        protocol.registerClientbound(ClientboundBedrockPackets.UPDATE_CLIENT_INPUT_LOCKS, null, wrapper -> {
+            wrapper.cancel();
+            wrapper.user().get(EntityTracker.class).getClientPlayer().setInputLocks(wrapper.read(BedrockTypes.UNSIGNED_VAR_INT));
+        });
         protocol.registerClientbound(ClientboundBedrockPackets.RESPAWN, ClientboundPackets26_3.RESPAWN, wrapper -> {
             final Position3f position = wrapper.read(BedrockTypes.POSITION_3F); // position
             final byte rawState = wrapper.read(Types.BYTE); // state
@@ -306,6 +310,9 @@ public final class ClientPlayerPackets {
 
             switch (action) {
                 case START_SPRINTING -> {
+                    if (!clientPlayer.inputLocks().allows(InputFlag.SPRINT, clientPlayer.mountEntityRuntimeId() != -1)) {
+                        return;
+                    }
                     clientPlayer.setSprinting(true);
                     clientPlayer.addAuthInputData(PlayerAuthInputData.StartSprinting);
                 }
@@ -384,7 +391,7 @@ public final class ClientPlayerPackets {
                     }
 
                     if (!gameSession.isBlockBreakingServerAuthoritative()) {
-                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock));
+                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock, position, direction.ordinal()));
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CrackBlock, position, direction.ordinal()));
                         clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, position, direction.ordinal()));
                     } else {
@@ -466,7 +473,9 @@ public final class ClientPlayerPackets {
                 return;
             }
             final InteractionHand hand = InteractionHand.values()[wrapper.read(Types.VAR_INT)]; // hand
-            if (hand != InteractionHand.MAIN_HAND || entityTracker.getClientPlayer().abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()) {
+            if (hand != InteractionHand.MAIN_HAND || entityTracker.getClientPlayer().abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()
+                    || (entityTracker.getClientPlayer().inputLocks().locked(net.raphimc.viabedrock.protocol.model.PlayerInputLocks.MOUNT)
+                    && net.raphimc.viabedrock.protocol.model.PlayerInputLocks.mountTarget(entity.type()))) {
                 wrapper.cancel();
                 return;
             }
@@ -544,7 +553,8 @@ public final class ClientPlayerPackets {
             final boolean right = wrapper.read(Types.BOOLEAN);
             final BoatEntity boat = wrapper.user().get(EntityTracker.class).controlledBoat();
             if (boat != null) {
-                boat.setPaddles(left, right);
+                final boolean movementLocked = wrapper.user().get(EntityTracker.class).getClientPlayer().inputLocks().locked(net.raphimc.viabedrock.protocol.model.PlayerInputLocks.MOVEMENT);
+                boat.setPaddles(left && !movementLocked, right && !movementLocked);
             }
         });
         protocol.registerServerbound(ServerboundPackets26_3.CLIENT_TICK_END, ServerboundBedrockPackets.PLAYER_AUTH_INPUT, wrapper -> {

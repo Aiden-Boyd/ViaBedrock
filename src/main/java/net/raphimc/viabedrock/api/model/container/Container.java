@@ -134,6 +134,12 @@ public abstract class Container {
     }
 
     protected boolean craftOutput(final int revision, final int recipeId, final BedrockItem output, final Map<Integer, Integer> consumed, final boolean quickMove) {
+        return this.craftOutput(revision, recipeId, output, consumed, quickMove, null, List.of(), TextProcessingEventOrigin.unknown);
+    }
+
+    protected boolean craftOutput(final int revision, final int recipeId, final BedrockItem output, final Map<Integer, Integer> consumed,
+                                  final boolean quickMove, final ItemStackRequestAction recipeAction, final List<String> filterStrings,
+                                  final TextProcessingEventOrigin origin) {
         final InventoryTracker inventory = this.user.get(InventoryTracker.class);
         final Container cursorContainer = inventory.getHudContainer();
         final Container destination = quickMove ? inventory.getInventoryContainer() : cursorContainer;
@@ -142,7 +148,7 @@ public abstract class Container {
         if (output.isEmpty() || output.amount() <= 0 || consumed.isEmpty()) {
             return false;
         }
-        int crafts = quickMove ? 255 : 1;
+        int crafts = quickMove && recipeAction == null ? 255 : 1;
         for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
             final BedrockItem input = this.getItem(ingredient.getKey());
             if (ingredient.getValue() <= 0 || input.netId() == null) {
@@ -183,7 +189,7 @@ public abstract class Container {
         final List<Container> snapshots = List.of(this.copy(), destination.copy());
         final Container cursorSnapshot = cursorContainer.copy();
         final List<ItemStackRequestAction> actions = new ArrayList<>();
-        actions.add(new ItemStackRequestAction.CraftRecipeAction(recipeId, crafts));
+        actions.add(recipeAction != null ? recipeAction : new ItemStackRequestAction.CraftRecipeAction(recipeId, crafts));
         for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
             final int slot = ingredient.getKey();
             actions.add(new ItemStackRequestAction.ConsumeAction(ingredient.getValue() * crafts,
@@ -207,7 +213,7 @@ public abstract class Container {
             updates.put(slot, placed);
             remaining -= amount;
         }
-        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, List.of(), TextProcessingEventOrigin.unknown);
+        final ItemStackRequestInfo request = new ItemStackRequestInfo(requestId, actions, filterStrings, origin);
         requests.addRequest(new InventoryRequestStorage(request, revision, cursorSnapshot, snapshots));
         for (Map.Entry<Integer, Integer> ingredient : consumed.entrySet()) {
             this.setItem(ingredient.getKey(), this.itemAfterRemovingAmount(this.getItem(ingredient.getKey()), ingredient.getValue() * crafts));

@@ -36,6 +36,7 @@ import net.raphimc.viabedrock.protocol.data.enums.java.*;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.GameMode;
 import net.raphimc.viabedrock.protocol.model.EntityAttribute;
 import net.raphimc.viabedrock.protocol.model.PlayerAbilities;
+import net.raphimc.viabedrock.protocol.model.PlayerInputLocks;
 import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.rewriter.GameTypeRewriter;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
@@ -67,6 +68,7 @@ public class ClientPlayerEntity extends PlayerEntity {
     private boolean prevOnGround;
     private final Set<PlayerAuthInputData> authInputData = EnumSet.noneOf(PlayerAuthInputData.class);
     private final List<AuthInputBlockAction> authInputBlockActions = new ArrayList<>();
+    private final PlayerInputLocks inputLocks = new PlayerInputLocks();
     private Set<InputFlag> inputFlags = EnumSet.noneOf(InputFlag.class);
     private Set<InputFlag> prevInputFlags = EnumSet.noneOf(InputFlag.class);
     private boolean horizontalCollision;
@@ -106,7 +108,7 @@ public class ClientPlayerEntity extends PlayerEntity {
         this.prevOnGround = this.onGround;
         this.prevInputFlags = this.inputFlags;
 
-        if (this.mountRuntimeId != -1 && this.sneaking && !this.requestedDismount) {
+        if (this.mountRuntimeId != -1 && this.sneaking && !this.requestedDismount && !this.inputLocks.locked(PlayerInputLocks.DISMOUNT)) {
             PlayerActionPacketFactory.sendBedrockDismount(this.user, this.mountRuntimeId);
             this.requestedDismount = true;
         }
@@ -350,7 +352,21 @@ public class ClientPlayerEntity extends PlayerEntity {
     }
 
     public void setInputFlags(final Set<InputFlag> inputFlags) {
-        this.inputFlags = inputFlags;
+        this.inputFlags = this.inputLocks.filter(inputFlags, this.mountRuntimeId != -1);
+    }
+
+    public PlayerInputLocks inputLocks() {
+        return this.inputLocks;
+    }
+
+    public void setInputLocks(final int mask) {
+        this.inputLocks.setMask(mask);
+        this.setInputFlags(this.inputFlags);
+        if (this.sprinting && !this.inputLocks.allows(InputFlag.SPRINT, this.mountRuntimeId != -1)) {
+            this.setSprinting(false);
+            this.authInputData.remove(PlayerAuthInputData.StartSprinting);
+            this.authInputData.add(PlayerAuthInputData.StopSprinting);
+        }
     }
 
     public Set<InputFlag> prevInputFlags() {

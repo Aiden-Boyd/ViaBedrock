@@ -39,6 +39,8 @@ import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import com.viaversion.nbt.tag.CompoundTag;
 
 public class AnvilContainer extends Container {
 
@@ -106,6 +108,15 @@ public class AnvilContainer extends Container {
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
         if (javaSlot == 2) {
+            if (this.getItem(2).isEmpty() && (action == ContainerInput.PICKUP || action == ContainerInput.QUICK_MOVE)
+                    && (button == 0 || button == 1) && !this.getItem(1).isEmpty() && this.getItem(1).netId() != null) {
+                final BedrockItem renamed = renameResult(this.getItem(1), this.renameText);
+                if (renamed.isEmpty()) {
+                    return false;
+                }
+                return this.craftOutput(revision, 0, renamed, Map.of(1, this.getItem(1).amount()), action == ContainerInput.QUICK_MOVE,
+                        new ItemStackRequestAction.CraftRecipeOptionalAction(0, 0), List.of(this.renameText), TextProcessingEventOrigin.AnvilText);
+            }
             if (action != ContainerInput.PICKUP || (button != 0 && button != 1)
                     || this.getItem(1).isEmpty() || this.getItem(1).netId() == null
                     || (!this.getItem(2).isEmpty() && this.getItem(2).netId() == null)
@@ -179,6 +190,29 @@ public class AnvilContainer extends Container {
             return true;
         }
         return super.handleClick(revision, javaSlot, button, action);
+    }
+
+    public static BedrockItem renameResult(final BedrockItem input, final String name) {
+        if (input.isEmpty() || name.length() > 50) {
+            return BedrockItem.empty();
+        }
+        final CompoundTag inputDisplay = input.tag() != null ? input.tag().getCompoundTag("display") : null;
+        final String oldName = inputDisplay != null ? inputDisplay.getString("Name", "") : "";
+        if (oldName.equals(name)) {
+            return BedrockItem.empty();
+        }
+        final BedrockItem result = input.copy();
+        final CompoundTag tag = result.tag() != null ? result.tag() : new CompoundTag();
+        final CompoundTag display = tag.get("display") instanceof CompoundTag oldDisplay ? oldDisplay : new CompoundTag();
+        if (name.isEmpty()) {
+            display.remove("Name");
+        } else {
+            display.putString("Name", name);
+        }
+        tag.put("display", display);
+        result.setTag(tag);
+        result.setNetId(null);
+        return result;
     }
 
     public String getRenameText() {

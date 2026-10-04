@@ -175,6 +175,7 @@ public final class InteractionPackets {
                 )
             );
             wrapper.write(inventoryTransactionRewriter.getInventoryTransactionType(), inventoryTransaction);
+            wrapper.user().get(ChunkTracker.class).acknowledgeBlockSequence(sequence);
         });
 
         protocol.registerServerbound(ServerboundPackets26_3.USE_ITEM_ON, null, wrapper -> {
@@ -335,4 +336,3 @@ public final class InteractionPackets {
     }
 
 }
-

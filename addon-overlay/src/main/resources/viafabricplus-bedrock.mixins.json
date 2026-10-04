@@ -55,7 +55,9 @@
     "features.misc.MixinJavaSkinPreload",
     "core.integration.MixinBedrockRealmInvite",
     "features.misc.MixinJavaSelfSkin",
-    "features.misc.MixinBedrockPermissions"
+    "features.misc.MixinBedrockPermissions",
+    "features.movement.MixinBedrockInputKeys",
+    "features.movement.MixinBedrockCameraLocks"
   ],
   "injectors": {
     "defaultRequire": 1

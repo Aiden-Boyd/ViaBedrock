@@ -113,7 +113,12 @@ public final class InventoryRequestPackets {
             final String newName = wrapper.read(Types.STRING);
 
             if (inventoryTracker.isContainerOpen() && inventoryTracker.getCurrentContainer() instanceof AnvilContainer anvilContainer) {
-                anvilContainer.setRenameText(newName);
+                wrapper.user().get(InventoryRequestTracker.class).runInventoryAction(() -> {
+                    if (inventoryTracker.enforceContainerPermissions() && inventoryTracker.getCurrentContainer() == anvilContainer
+                            && inventoryTracker.getPendingCloseContainer() == null) {
+                        anvilContainer.setRenameText(newName);
+                    }
+                });
             }
         });
         protocol.registerServerbound(ServerboundPackets26_3.CONTAINER_SLOT_STATE_CHANGED, ServerboundBedrockPackets.TOGGLE_CRAFTER_SLOT_REQUEST, wrapper -> {
@@ -215,19 +220,13 @@ public final class InventoryRequestPackets {
                         if (expectedItem.isEmpty()) {
                             continue;
                         }
-                        if (expectedItem.amount() != amount) {
-                            final BedrockItem updated = expectedItem.copy();
-                            if (slotInfo.itemNetId() > 0) {
-                                updated.setNetId(slotInfo.itemNetId());
-                            }
-                            updated.setAmount(amount);
+                        final BedrockItem updated = applyStackResponse(expectedItem, slotInfo);
+                        if (expectedItem.isDifferent(updated) || expectedItem.amount() != updated.amount()) {
                             container.setItem(slot, updated);
                             changedContainers.add(container);
-                        } else {
-                            // Stack network IDs are invisible to Java. Updating only the ID must not rewind its prediction.
-                            if (slotInfo.itemNetId() > 0) {
-                                expectedItem.setNetId(slotInfo.itemNetId());
-                            }
+                        } else if (slotInfo.itemNetId() > 0) {
+                            // Network IDs alone do not change the Java item or rewind its prediction.
+                            expectedItem.setNetId(slotInfo.itemNetId());
                         }
                     }
                 }
@@ -333,6 +332,31 @@ public final class InventoryRequestPackets {
 
             enchantmentContainer.setEnchantData(data);
         });
+    }
+
+    public static BedrockItem applyStackResponse(final BedrockItem expected, final ItemStackResponseSlotInfo response) {
+        final BedrockItem updated = expected.copy();
+        updated.setAmount(Byte.toUnsignedInt(response.amount()));
+        if (response.itemNetId() > 0) {
+            updated.setNetId(response.itemNetId());
+        }
+        final com.viaversion.nbt.tag.CompoundTag tag = updated.tag() != null ? updated.tag() : new com.viaversion.nbt.tag.CompoundTag();
+        final String name = response.filteredCustomName() != null ? response.filteredCustomName() : response.customName();
+        if (!name.isEmpty()) {
+            final com.viaversion.nbt.tag.CompoundTag display = tag.get("display") instanceof com.viaversion.nbt.tag.CompoundTag existingDisplay ? existingDisplay : new com.viaversion.nbt.tag.CompoundTag();
+            display.putString("Name", name);
+            tag.put("display", display);
+        } else if (tag.get("display") instanceof com.viaversion.nbt.tag.CompoundTag display) {
+            display.remove("Name");
+        }
+        // Non-durable items must not acquire damage components from a default zero correction.
+        if (tag.contains("Damage") || response.durability() > 0) {
+            tag.putInt("Damage", Math.max(0, response.durability()));
+        }
+        if (!tag.getValue().isEmpty()) {
+            updated.setTag(tag);
+        }
+        return updated;
     }
 
     private InventoryRequestPackets() {
