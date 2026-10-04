@@ -82,6 +82,11 @@ jobs:
         working-directory: ../viafabricplus-bedrock
         run: ./gradlew clean build --refresh-dependencies
 
+      - name: Inspect Minecraft menu APIs
+        working-directory: ../viafabricplus-bedrock
+        run: |
+          python3 ../ViaBedrock/tools/addon/inspect-menu-api.py
+
       - name: Verify custom ViaBedrock code was embedded
         run: |
           LOCAL_JAR="$HOME/.m2/repository/net/raphimc/ViaBedrock/0.0.31-SNAPSHOT/ViaBedrock-0.0.31-SNAPSHOT.jar"
