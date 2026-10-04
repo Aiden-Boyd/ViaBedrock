@@ -50,6 +50,10 @@ import net.raphimc.viabedrock.api.chunk.light.LightEngine;
 import net.raphimc.viabedrock.api.chunk.section.BedrockChunkSection;
 import net.raphimc.viabedrock.api.chunk.section.BedrockChunkSectionImpl;
 import net.raphimc.viabedrock.api.model.BedrockBlockState;
+import net.raphimc.viabedrock.api.model.BlockState;
+import net.raphimc.viabedrock.api.model.BlockConnections;
+import net.raphimc.viabedrock.api.model.BlockPredictionQueue;
+import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.ProtocolConstants;
@@ -83,6 +87,8 @@ public class ChunkTracker extends StoredObject {
 
     private final Long2ObjectMap<BedrockChunk> chunks = new Long2ObjectOpenHashMap<>();
     private final Set<Long> dirtyChunks = new LinkedHashSet<>();
+    private final Set<BlockPosition> connectedBlockUpdates = new LinkedHashSet<>();
+    private final BlockPredictionQueue blockPredictions = new BlockPredictionQueue();
 
     private final Long2ObjectMap<int[][]> javaBlockStateCache = new Long2ObjectOpenHashMap<>(); // chunk key -> per section java block states
     private final Long2ObjectMap<ChunkLight> chunkLight = new Long2ObjectOpenHashMap<>(); // Only chunks sent to the client have cached light
@@ -235,7 +241,30 @@ public class ChunkTracker extends StoredObject {
         final int sectionY = blockPosition.y() & 15;
         final int sectionZ = blockPosition.z() & 15;
 
-        return this.getJavaBlockState(chunkSection, sectionX, sectionY, sectionZ);
+        final int baseId = this.getJavaBlockState(chunkSection, sectionX, sectionY, sectionZ);
+        final BlockStateRewriter rewriter = this.user().get(BlockStateRewriter.class);
+        final BlockState javaState = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(baseId);
+        BlockState connected = javaState;
+        if (javaState != null && javaState.identifier().endsWith("_door")) {
+            final int offset = javaState.hasProperty("half", "upper") ? -1 : 1;
+            final BlockPosition otherPosition = new BlockPosition(blockPosition.x(), blockPosition.y() + offset, blockPosition.z());
+            final int otherId = rewriter.javaId(this.getBlockState(otherPosition));
+            connected = BlockConnections.door(javaState, BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(otherId));
+        } else if (javaState != null && javaState.identifier().endsWith("chest") && !javaState.identifier().equals("ender_chest")) {
+            final BedrockBlockEntity entity = this.getBlockEntity(blockPosition);
+            final CompoundTag tag = entity != null ? entity.tag() : null;
+            final BlockPosition partner = BlockConnections.chestPartner(blockPosition, tag);
+            if (partner != null) {
+                final BlockState other = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(rewriter.javaId(this.getBlockState(partner)));
+                if (other != null && other.namespacedIdentifier().equals(javaState.namespacedIdentifier())
+                        && Objects.equals(other.properties().get("facing"), javaState.properties().get("facing"))) {
+                    connected = BlockConnections.chest(javaState, blockPosition, tag);
+                } else {
+                    connected = javaState.replaceProperty("type", "single");
+                }
+            }
+        }
+        return connected != null ? BedrockProtocol.MAPPINGS.getJavaBlockStates().getOrDefault(connected, baseId) : baseId;
     }
 
     public int getJavaBlockState(final BedrockChunkSection section, final int sectionX, final int sectionY, final int sectionZ) {
@@ -282,8 +311,19 @@ public class ChunkTracker extends StoredObject {
             return;
         }
 
+        final BedrockBlockEntity previous = chunk.getBlockEntityAt(bedrockBlockEntity.position());
+        final BlockPosition previousPartner = previous != null ? BlockConnections.chestPartner(previous.position(), previous.tag()) : null;
+        if (previousPartner != null) {
+            this.connectedBlockUpdates.add(previousPartner);
+            this.connectedBlockUpdates.add(bedrockBlockEntity.position());
+        }
         chunk.removeBlockEntityAt(bedrockBlockEntity.position());
         chunk.blockEntities().add(bedrockBlockEntity);
+        final BlockPosition partner = BlockConnections.chestPartner(bedrockBlockEntity.position(), bedrockBlockEntity.tag());
+        if (partner != null) {
+            this.connectedBlockUpdates.add(bedrockBlockEntity.position());
+            this.connectedBlockUpdates.add(partner);
+        }
     }
 
     public boolean isChunkLoaded(final ChunkPosition chunkPos) {
@@ -413,7 +453,23 @@ public class ChunkTracker extends StoredObject {
         palette.setIdAt(sectionX, sectionY, sectionZ, blockState);
         final String tag = blockStateRewriter.tag(blockState);
 
-        int remappedBlockState = this.getJavaBlockState(section, sectionX, sectionY, sectionZ);
+        int remappedBlockState = this.getJavaBlockState(blockPosition);
+        this.blockPredictions.blockUpdated(blockPosition, System.nanoTime());
+        final BlockState currentState = blockStateRewriter.blockState(blockState);
+        final BlockState previousState = blockStateRewriter.blockState(prevBlockState);
+        if ((currentState != null && currentState.identifier().endsWith("_door"))
+                || (previousState != null && previousState.identifier().endsWith("_door"))) {
+            this.connectedBlockUpdates.add(blockPosition);
+            this.connectedBlockUpdates.add(new BlockPosition(blockPosition.x(), blockPosition.y() - 1, blockPosition.z()));
+            this.connectedBlockUpdates.add(new BlockPosition(blockPosition.x(), blockPosition.y() + 1, blockPosition.z()));
+        }
+        if (CustomBlockTags.CHEST.equals(prevTag) || CustomBlockTags.TRAPPED_CHEST.equals(prevTag)) {
+            final BedrockBlockEntity previousEntity = this.getBlockEntity(blockPosition);
+            final BlockPosition partner = previousEntity != null ? BlockConnections.chestPartner(blockPosition, previousEntity.tag()) : null;
+            if (partner != null) {
+                this.connectedBlockUpdates.add(partner);
+            }
+        }
         if (!Objects.equals(prevTag, tag)) {
             this.getChunk(blockPosition.x() >> 4, blockPosition.z() >> 4).removeBlockEntityAt(blockPosition);
             entityTracker.removeItemFrame(blockPosition);
@@ -766,7 +822,40 @@ public class ChunkTracker extends StoredObject {
         return empty;
     }
 
+    public void deferBlockAcknowledgement(final int sequence, final BlockPosition clicked, final BlockPosition target) {
+        final Set<BlockPosition> positions = new LinkedHashSet<>();
+        positions.add(clicked);
+        positions.add(target);
+        for (BlockPosition position : List.of(clicked, target)) {
+            positions.add(new BlockPosition(position.x(), position.y() - 1, position.z()));
+            positions.add(new BlockPosition(position.x(), position.y() + 1, position.z()));
+        }
+        this.blockPredictions.add(sequence, positions, System.nanoTime());
+    }
+
+    public void acknowledgeBlockSequence(final int sequence) {
+        if (this.blockPredictions.isEmpty()) {
+            PacketFactory.sendJavaBlockChangedAck(this.user(), sequence);
+        } else {
+            this.blockPredictions.addConfirmed(sequence, System.nanoTime());
+        }
+    }
+
     public void tick() {
+        for (BlockPosition position : this.connectedBlockUpdates) {
+            if (this.getChunkSection(position) != null) {
+                PacketFactory.sendJavaBlockUpdate(this.user(), position, this.getJavaBlockState(position));
+            }
+        }
+        this.connectedBlockUpdates.clear();
+        for (BlockPredictionQueue.Prediction prediction : this.blockPredictions.pollReady(System.nanoTime())) {
+            for (BlockPosition position : prediction.positions()) {
+                if (this.getChunkSection(position) != null) {
+                    PacketFactory.sendJavaBlockUpdate(this.user(), position, this.getJavaBlockState(position));
+                }
+            }
+            PacketFactory.sendJavaBlockChangedAck(this.user(), prediction.sequence());
+        }
         // Keep request preparation and Java chunk sends within the same per-tick time budget.
         final long deadline = System.nanoTime() + 30_000_000L;
         if (this.user().get(EntityTracker.class) != null && this.user().get(EntityTracker.class).getClientPlayer().isInitiallySpawned()) {
@@ -894,6 +983,11 @@ public class ChunkTracker extends StoredObject {
                     for (int z = 0; z < 16; z++) {
                         for (int x = 0; x < 16; x++) {
                             final String tag = paletteIndexBlockStateTags[remappedBlockPalette.paletteIndexAt(remappedBlockPalette.index(x, y, z))];
+                            final BlockState bedrockState = blockStateRewriter.blockState(layer0.idAt(x, y, z));
+                            if (bedrockState != null && bedrockState.identifier().endsWith("_door")) {
+                                final BlockPosition doorPosition = new BlockPosition((chunk.getX() << 4) + x, this.minY + (idx << 4) + y, (chunk.getZ() << 4) + z);
+                                remappedBlockPalette.setIdAt(x, y, z, this.getJavaBlockState(doorPosition));
+                            }
                             if (tag != null) {
                                 if (BlockEntityRewriter.isBlockEntity(tag)) {
                                     final int absY = this.minY + (idx << 4) + y;

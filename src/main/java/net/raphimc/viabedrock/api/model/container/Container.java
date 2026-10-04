@@ -269,7 +269,7 @@ public abstract class Container {
             }
             final BedrockItem destination = slot.container().getItem(slot.bedrockSlot());
             final int amount = Math.min(perSlot, Math.min(remaining.amount(),
-                    this.user.get(ItemRewriter.class).maxStackSize(remaining) - destination.amount()));
+                    slot.container().slotStackLimit(slot.bedrockSlot(), remaining) - destination.amount()));
             if (amount <= 0) {
                 continue;
             }
@@ -294,13 +294,16 @@ public abstract class Container {
     }
 
     private boolean isDragDestination(final SlotRef slot, final BedrockItem cursor) {
+        if (!slot.container().canPlaceItem(slot.bedrockSlot(), cursor)) {
+            return false;
+        }
         final ContainerEnumName name = slot.container().getFullContainerName(slot.bedrockSlot()).name();
         if (name == ContainerEnumName.CreatedOutputContainer || name == ContainerEnumName.CraftingOutputPreviewContainer) {
             return false;
         }
         final BedrockItem item = slot.container().getItem(slot.bedrockSlot());
         return (item.isEmpty() || (!item.isDifferent(cursor) && item.netId() != null))
-                && item.amount() < this.user.get(ItemRewriter.class).maxStackSize(cursor);
+                && item.amount() < slot.container().slotStackLimit(slot.bedrockSlot(), cursor);
     }
 
     private ItemStackRequestAction handlePickupClick(final ClickContext clickContext, final short javaSlot, final byte button) {
@@ -333,15 +336,21 @@ public abstract class Container {
             return this.handlePickupTake(clickContext, container, bedrockSlot, button, item);
         }
 
-        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
+        if (!container.canPlaceItem(bedrockSlot, cursorItem)) {
+            return null;
+        }
+        final int slotLimit = container.slotStackLimit(bedrockSlot, cursorItem);
 
         if (item.isEmpty() || !item.isDifferent(cursorItem)) {
-            if (!item.isEmpty() && item.amount() >= itemRewriter.maxStackSize(cursorItem)) {
+            if (!item.isEmpty() && item.amount() >= slotLimit) {
                 return null;
             }
             return this.handlePickupPlace(clickContext, container, bedrockSlot, button, cursorItem, item);
         }
 
+        if (cursorItem.amount() > slotLimit) {
+            return null;
+        }
         return this.handlePickupSwap(clickContext, container, bedrockSlot, cursorItem, item);
     }
 
@@ -363,7 +372,7 @@ public abstract class Container {
 
     private ItemStackRequestAction handlePickupPlace(final ClickContext clickContext, final Container container, final int bedrockSlot, final byte button, final BedrockItem cursorItem, final BedrockItem item) {
         final int amt = button == 0 ? cursorItem.amount() : 1;
-        final int amountToPlace = Math.min(amt, this.user.get(ItemRewriter.class).maxStackSize(cursorItem) - (item.isEmpty() ? 0 : item.amount()));
+        final int amountToPlace = Math.min(amt, container.slotStackLimit(bedrockSlot, cursorItem) - (item.isEmpty() ? 0 : item.amount()));
 
         final int containerNetId = item.netId() != null ? item.netId() : 0;
         BedrockItem finalContainerItem = item.copy();
@@ -429,6 +438,12 @@ public abstract class Container {
             return null;
         }
 
+        if ((!hotbarItem.isEmpty() && (!container.canPlaceItem(bedrockSlot, hotbarItem)
+                || hotbarItem.amount() > container.slotStackLimit(bedrockSlot, hotbarItem)))
+                || (!item.isEmpty() && (!hotbarContainer.canPlaceItem(targetSlot, item)
+                || item.amount() > hotbarContainer.slotStackLimit(targetSlot, item)))) {
+            return null;
+        }
         container.setItem(bedrockSlot, hotbarItem);
         hotbarContainer.setItem(targetSlot, item);
 
@@ -463,8 +478,6 @@ public abstract class Container {
             return List.of();
         }
 
-        final ItemRewriter itemRewriter = this.user.get(ItemRewriter.class);
-
         final List<ItemStackRequestAction> actions = new ArrayList<>();
         final List<QuickMoveRange> ranges = this.quickMoveRanges(javaSlot, source);
         final Set<Container> snapshots = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -488,7 +501,10 @@ public abstract class Container {
                         continue;
                     }
                     final BedrockItem destinationItem = range.container().getItem(bedrockDestSlot);
-                    final int slotMaxStackSize = range.container() == clickContext.inventoryTracker.getArmorContainer() ? 1 : itemRewriter.maxStackSize(sourceItem);
+                    if (!range.container().canPlaceItem(bedrockDestSlot, sourceItem)) {
+                        continue;
+                    }
+                    final int slotMaxStackSize = range.container().slotStackLimit(bedrockDestSlot, sourceItem);
                     if (mergePass) {
                         if (destinationItem == null || destinationItem.isEmpty() || destinationItem.isDifferent(sourceItem) || destinationItem.amount() >= slotMaxStackSize || destinationItem.netId() == null) {
                             continue;
@@ -786,6 +802,20 @@ public abstract class Container {
         final BedrockItem copy = item.copy();
         copy.setAmount(item.amount() - amountToRemove);
         return copy;
+    }
+
+    protected boolean canPlaceItem(final int bedrockSlot, final BedrockItem item) {
+        final String name = this.getFullContainerName(bedrockSlot).name().name();
+        if (name.endsWith("OutputContainer") || name.equals("CraftingOutputPreviewContainer")) {
+            return false;
+        }
+        final InventoryTracker inventory = this.user.get(InventoryTracker.class);
+        return this != inventory.getArmorContainer() || this.equipmentJavaSlot(item) == this.javaSlot(bedrockSlot);
+    }
+
+    protected int slotStackLimit(final int bedrockSlot, final BedrockItem item) {
+        final InventoryTracker inventory = this.user.get(InventoryTracker.class);
+        return this == inventory.getArmorContainer() ? 1 : this.user.get(ItemRewriter.class).maxStackSize(item);
     }
 
     public boolean handleButtonClick(final int button) {

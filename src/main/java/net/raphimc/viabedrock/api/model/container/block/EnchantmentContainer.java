@@ -37,6 +37,7 @@ import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.protocol.model.recipe.EnchantData;
+import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.protocol.storage.InventoryRequestTracker;
@@ -95,6 +96,36 @@ public class EnchantmentContainer extends Container {
     }
 
     @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.size() && items.length != 54) {
+            return false;
+        }
+        this.setItem(14, items.length == 54 ? items[14] : items[0]);
+        this.setItem(15, items.length == 54 ? items[15] : items[1]);
+        return true;
+    }
+
+    public static boolean acceptsItem(final int slot, final String identifier, final int enchantValue, final boolean enchanted) {
+        if (slot == 15) {
+            return "minecraft:lapis_lazuli".equals(identifier);
+        }
+        return slot == 14 && enchantValue > 0 && !enchanted && !"minecraft:enchanted_book".equals(identifier);
+    }
+
+    @Override
+    protected boolean canPlaceItem(final int slot, final BedrockItem item) {
+        final String identifier = this.user.get(ItemRewriter.class).getItems().inverse().get(item.identifier());
+        final CompoundTag definition = BedrockProtocol.MAPPINGS.getBedrockItems().get(identifier);
+        final boolean enchanted = item.tag() != null && item.tag().getListTag("ench") != null && item.tag().getListTag("ench").size() > 0;
+        return acceptsItem(slot, identifier, definition != null ? definition.getInt("enchantValue", 0) : 0, enchanted);
+    }
+
+    @Override
+    protected int slotStackLimit(final int slot, final BedrockItem item) {
+        return slot == 14 ? 1 : super.slotStackLimit(slot, item);
+    }
+
+    @Override
     public boolean handleButtonClick(final int button) {
         if (button < 0 || button > 2 || button >= this.data.size()) {
             ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received invalid enchantment option button click: " + button);
@@ -109,6 +140,15 @@ public class EnchantmentContainer extends Container {
         final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
 
         prevContainers.add(this.copy());
+
+        if (this.getItem(14).isEmpty() || this.getItem(14).netId() == null) {
+            return false;
+        }
+        final boolean consumesLapis = entityTracker.getClientPlayer().gameType() == GameType.Survival
+                || entityTracker.getClientPlayer().gameType() == GameType.Adventure;
+        if (consumesLapis && (this.getItem(15).amount() < button + 1 || this.getItem(15).netId() == null)) {
+            return false;
+        }
 
         final int reqId = inventoryRequestTracker.nextRequestId();
 
@@ -130,7 +170,7 @@ public class EnchantmentContainer extends Container {
         actions.add(consumeAction);
         actions.add(placeAction);
 
-        if (entityTracker.getClientPlayer().gameType() == GameType.Survival || entityTracker.getClientPlayer().gameType() == GameType.Adventure) {
+        if (consumesLapis) {
             final ItemStackRequestAction consumeAction2 = new ItemStackRequestAction.ConsumeAction(button + 1, new ItemStackRequestSlotInfo(
                     this.getFullContainerName(15), (byte) 15, this.getItem(15).netId()
             ));

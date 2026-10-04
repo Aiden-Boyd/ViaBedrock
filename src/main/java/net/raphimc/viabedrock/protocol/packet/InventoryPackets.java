@@ -58,6 +58,7 @@ import net.lenni0451.mcstructs_bedrock.text.utils.BedrockTextUtils;
 
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.chunk.BedrockBlockEntity;
+import net.raphimc.viabedrock.api.model.BlockConnections;
 import net.raphimc.viabedrock.api.model.container.ChestContainer;
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.model.container.block.*;
@@ -118,7 +119,7 @@ public final class InventoryPackets {
 
             final boolean doubleChest = blockEntity != null && blockEntity.tag() != null
                     && "Chest".equals(blockEntity.tag().getString("id"))
-                    && blockEntity.tag().contains("pairlead");
+                    && BlockConnections.chestPartner(position, blockEntity.tag()) != null;
 
             final Container container;
             switch (type) {

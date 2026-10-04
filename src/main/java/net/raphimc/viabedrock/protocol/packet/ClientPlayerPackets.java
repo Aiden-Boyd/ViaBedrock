@@ -317,7 +317,7 @@ public final class ClientPlayerPackets {
             if (isMining && (gameSession.isImmutableWorld() || !clientPlayer.abilities().getBooleanValue(AbilitiesIndex.Mine))) {
                 // TODO: Prevent breaking and cancel any packets that would be sent (swing, player action)
                 PacketFactory.sendJavaBlockUpdate(wrapper.user(), position, chunkTracker.getJavaBlockState(position));
-                PacketFactory.sendJavaBlockChangedAck(wrapper.user(), sequence);
+                chunkTracker.acknowledgeBlockSequence(sequence);
                 return;
             }
 
@@ -404,7 +404,7 @@ public final class ClientPlayerPackets {
             }
 
             if (sequence > 0) {
-                PacketFactory.sendJavaBlockChangedAck(wrapper.user(), sequence);
+                chunkTracker.acknowledgeBlockSequence(sequence);
             }
         });
         protocol.registerServerbound(ServerboundPackets26_3.ATTACK, ServerboundBedrockPackets.INVENTORY_TRANSACTION, wrapper -> {

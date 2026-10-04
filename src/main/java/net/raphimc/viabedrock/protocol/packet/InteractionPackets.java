@@ -25,6 +25,9 @@ import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.api.model.BlockState;
+import net.raphimc.viabedrock.api.model.BlockConnections;
+import net.raphimc.viabedrock.protocol.rewriter.BlockStateRewriter;
 import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.model.entity.Entity;
@@ -196,13 +199,14 @@ public final class InteractionPackets {
             final boolean insideBlock = wrapper.read(Types.BOOLEAN); // inside block
             wrapper.read(Types.BOOLEAN); // world border, this doesn't exist on Bedrock.
 
-            // Send back block changed ack with the sequence, this will help with ghost blocks.
-            PacketFactory.sendJavaBlockChangedAck(wrapper.user(), wrapper.read(Types.VAR_INT));
+            final int sequence = wrapper.read(Types.VAR_INT);
 
             // The player can only interact using the main hand on Bedrock!
             if (hand != InteractionHand.MAIN_HAND) {
+                chunkTracker.acknowledgeBlockSequence(sequence);
                 return;
             }
+            chunkTracker.deferBlockAcknowledgement(sequence, position, position.getRelative(face));
 
             // The bedrock client will send a start item use on action to the server first.
             PlayerActionPacketFactory.sendBedrockPlayerAction(
@@ -219,7 +223,10 @@ public final class InteractionPackets {
 
             BedrockItem predictedToItem = inventoryTracker.getInventoryContainer().getSelectedHotbarItem().copy();
             // This is not entirely correct, but at least it's more accurate than not sending actions or sending the original item data.
-            if (predictedToItem.blockRuntimeId() != 0 && clientPlayer.javaGameMode() != GameMode.CREATIVE) {
+            final BlockState clickedState = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(chunkTracker.getJavaBlockState(position));
+            final String clickedTag = wrapper.user().get(BlockStateRewriter.class).tag(chunkTracker.getBlockState(position));
+            final boolean usesBlock = !clientPlayer.isSneaking() && BlockConnections.usesBlockInteraction(clickedState, clickedTag);
+            if (!usesBlock && predictedToItem.blockRuntimeId() != 0 && clientPlayer.javaGameMode() != GameMode.CREATIVE) {
                 predictedToItem.setAmount(predictedToItem.amount() - 1);
             }
             if (predictedToItem.amount() <= 0) {

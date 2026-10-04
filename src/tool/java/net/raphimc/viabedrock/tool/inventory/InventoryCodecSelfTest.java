@@ -31,6 +31,13 @@ import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.api.model.container.block.EnchantmentContainer;
+import net.raphimc.viabedrock.api.model.BlockState;
+import net.raphimc.viabedrock.api.model.BlockConnections;
+import net.raphimc.viabedrock.api.model.BlockPredictionQueue;
+import com.viaversion.nbt.tag.CompoundTag;
+import com.viaversion.viaversion.api.minecraft.BlockPosition;
+import java.util.Set;
 import java.util.List;
 import java.util.UUID;
 import java.util.Arrays;
@@ -80,7 +87,79 @@ public final class InventoryCodecSelfTest {
         checkCrafting();
         checkVirtualContainers();
         checkInventorySequencing();
+        checkBlockConnections();
+        checkBlockPredictions();
         System.out.println("Inventory protocol 2193 and crafting fixtures passed");
+    }
+
+    private static void checkBlockConnections() {
+        if (!BlockConnections.usesBlockInteraction(BlockState.fromString("minecraft:oak_door"), null)
+                || !BlockConnections.usesBlockInteraction(BlockState.fromString("minecraft:stonecutter"), "stonecutter")
+                || BlockConnections.usesBlockInteraction(BlockState.fromString("minecraft:iron_door"), null)
+                || BlockConnections.usesBlockInteraction(BlockState.fromString("minecraft:stone"), null)) {
+            throw new AssertionError("Block interaction was mistaken for item placement");
+        }
+        final BlockPosition position = new BlockPosition(0, 64, -1);
+        final String[] facings = {"north", "east", "south", "west"};
+        final int[][] partners = {{1, -1}, {0, 0}, {-1, -1}, {0, -2}};
+        for (int i = 0; i < facings.length; i++) {
+            final BlockState single = BlockState.fromString("minecraft:chest[facing=" + facings[i] + ",type=single,waterlogged=false]");
+            final CompoundTag tag = new CompoundTag();
+            tag.putInt("pairx", partners[i][0]);
+            tag.putInt("pairz", partners[i][1]);
+            final BlockPosition partner = BlockConnections.chestPartner(position, tag);
+            if (partner == null || !BlockConnections.chest(single, position, tag).hasProperty("type", "left")) {
+                throw new AssertionError("Chest pairing failed for " + facings[i]);
+            }
+            tag.putInt("pairx", position.x());
+            tag.putInt("pairz", position.z());
+            if (!BlockConnections.chest(single, partner, tag).hasProperty("type", "right")) {
+                throw new AssertionError("Chest halves did not complement each other");
+            }
+            if (!BlockConnections.chest(single, position, new CompoundTag()).hasProperty("type", "single")) {
+                throw new AssertionError("Unpaired chest became double");
+            }
+        }
+        for (boolean open : new boolean[]{false, true}) {
+            for (String hinge : new String[]{"left", "right"}) {
+                final BlockState lower = BlockState.fromString("minecraft:oak_door[facing=east,half=lower,hinge=left,open=" + open + ",powered=false]");
+                final BlockState upper = BlockState.fromString("minecraft:oak_door[facing=north,half=upper,hinge=" + hinge + ",open=false,powered=false]");
+                final BlockState mergedLower = BlockConnections.door(lower, upper);
+                final BlockState mergedUpper = BlockConnections.door(upper, lower);
+                if (!mergedLower.hasProperty("hinge", hinge) || !mergedUpper.hasProperty("hinge", hinge)
+                        || !mergedUpper.hasProperty("facing", "east") || !mergedUpper.hasProperty("open", Boolean.toString(open))
+                        || !mergedLower.hasProperty("half", "lower") || !mergedUpper.hasProperty("half", "upper")) {
+                    throw new AssertionError("Door properties were not combined across halves");
+                }
+            }
+        }
+    }
+
+    private static void checkBlockPredictions() {
+        final BlockPosition clicked = new BlockPosition(0, 64, 0);
+        final BlockPosition placed = new BlockPosition(1, 64, 0);
+        final BlockPredictionQueue queue = new BlockPredictionQueue();
+        queue.add(1, Set.of(clicked, placed), 0);
+        queue.addConfirmed(2, 1);
+        if (!queue.pollReady(10_000_000L).isEmpty()) {
+            throw new AssertionError("A later acknowledgement released an unconfirmed prediction");
+        }
+        queue.blockUpdated(new BlockPosition(9, 64, 9), 20_000_000L);
+        if (!queue.pollReady(80_000_000L).isEmpty()) {
+            throw new AssertionError("Unrelated block update confirmed a placement");
+        }
+        queue.blockUpdated(placed, 100_000_000L);
+        if (!queue.pollReady(149_000_000L).isEmpty()) {
+            throw new AssertionError("Acknowledgement preceded settled block updates");
+        }
+        final var ready = queue.pollReady(150_000_000L);
+        if (ready.size() != 2 || ready.get(0).sequence() != 1 || ready.get(1).sequence() != 2 || !queue.isEmpty()) {
+            throw new AssertionError("Block acknowledgements lost sequence order");
+        }
+        queue.add(3, Set.of(placed), 200_000_000L);
+        if (!queue.pollReady(1_199_000_000L).isEmpty() || queue.pollReady(1_200_000_000L).size() != 1) {
+            throw new AssertionError("Rejected placement did not reach correction timeout");
+        }
     }
 
     private static void checkInventorySequencing() {
@@ -136,6 +215,19 @@ public final class InventoryCodecSelfTest {
         storages.put(CraftingDataTracker.class, tracker[0]);
         final InventoryTracker inventory = new InventoryTracker(user);
         storages.put(InventoryTracker.class, inventory);
+        final EnchantmentContainer enchanting = new EnchantmentContainer(user, (byte) 3, null, null);
+        final BedrockItem book = new BedrockItem(1);
+        final BedrockItem lapis = new BedrockItem(2);
+        if (!enchanting.setItems(new BedrockItem[]{book, lapis}) || enchanting.getItem(14).identifier() != 1
+                || enchanting.getItem(15).identifier() != 2 || !enchanting.setItems(BedrockItem.emptyArray(54))
+                || !enchanting.getItem(14).isEmpty() || !enchanting.getItem(15).isEmpty()
+                || EnchantmentContainer.acceptsItem(14, "minecraft:wheat", 0, false)
+                || EnchantmentContainer.acceptsItem(15, "minecraft:wheat", 0, false)
+                || !EnchantmentContainer.acceptsItem(15, "minecraft:lapis_lazuli", 0, false)
+                || !EnchantmentContainer.acceptsItem(14, "minecraft:book", 1, false)
+                || EnchantmentContainer.acceptsItem(14, "minecraft:diamond_sword", 10, true)) {
+            throw new AssertionError("Enchanting slot updates or item restrictions failed");
+        }
         final StonecutterContainer stonecutter = new StonecutterContainer(user, (byte) 1, null, null);
         if (!stonecutter.setItems(BedrockItem.emptyArray(2)) || !stonecutter.setItems(BedrockItem.emptyArray(54))
                 || stonecutter.bedrockSlot(0) != 3 || stonecutter.bedrockSlot(1) != 50
