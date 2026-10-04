@@ -45,8 +45,8 @@ import org.apache.logging.log4j.Logger;
 
 /** Client transport and protocol engine only. Java servers keep their native pipeline. */
 public final class BedrockClient {
-    private static final BedrockClient INSTANCE = new BedrockClient();
     public static final ProtocolVersion NATIVE_VERSION = ProtocolVersion.v26_3;
+    private static final BedrockClient INSTANCE = new BedrockClient();
     public static final AttributeKey<Connection> CONNECTION = AttributeKey.valueOf("viabedrock-connection");
     public static final AttributeKey<ProtocolVersion> TARGET_VERSION = AttributeKey.valueOf("viabedrock-target-version");
     private final Path path = FabricLoader.getInstance().getConfigDir().resolve("viabedrock");
@@ -61,7 +61,8 @@ public final class BedrockClient {
     public ProtocolVersion targetVersion() {
         final var minecraft = Minecraft.getInstance();
         final var handler = minecraft == null ? null : minecraft.getConnection();
-        return handler == null ? this.connectingTarget : ((IConnection) handler.getConnection()).viaFabricPlus$getTargetVersion();
+        final var version = handler == null ? this.connectingTarget : ((IConnection) handler.getConnection()).viaFabricPlus$getTargetVersion();
+        return version == null ? NATIVE_VERSION : version;
     }
     public UserConnection userConnection() {
         final var minecraft = Minecraft.getInstance();
