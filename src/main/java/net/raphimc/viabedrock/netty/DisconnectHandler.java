@@ -31,7 +31,7 @@ public class DisconnectHandler extends ChannelOutboundHandlerAdapter {
     public void close(final ChannelHandlerContext ctx, final ChannelPromise promise) throws Exception {
         if (ctx.channel().isActive() && !this.calledDisconnect) {
             this.calledDisconnect = true;
-            ctx.disconnect().addListener(_ -> ctx.close(promise)); // Always release transports that remain open after disconnect.
+            ctx.disconnect().addListener(future -> ctx.close(promise)); // Always release transports that remain open after disconnect.
         } else {
             super.close(ctx, promise);
         }
