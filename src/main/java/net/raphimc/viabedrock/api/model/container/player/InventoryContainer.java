@@ -37,6 +37,8 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
+import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
 public class InventoryContainer extends Container {
@@ -50,6 +52,20 @@ public class InventoryContainer extends Container {
     public InventoryContainer(final UserConnection user, final byte containerId, final BlockPosition position, final InventoryContainer inventoryContainer) {
         super(user, containerId, inventoryContainer.type, inventoryContainer.title, position, inventoryContainer.items, inventoryContainer.validBlockTags);
         this.selectedHotbarSlot = inventoryContainer.selectedHotbarSlot;
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short slot, final byte button, final ContainerInput action) {
+        final HudContainer hud = this.user.get(InventoryTracker.class).getHudContainer();
+        if (slot == 0) {
+            return action == ContainerInput.PICKUP && (button == 0 || button == 1) && hud.craft(revision);
+        }
+        final boolean handled = super.handleClick(revision, slot, button, action);
+        if (slot >= 1 && slot <= 4) {
+            hud.updateCraftingResult();
+            PacketFactory.sendJavaContainerSetContent(this.user, this);
+        }
+        return handled;
     }
 
     @Override
@@ -70,6 +86,7 @@ public class InventoryContainer extends Container {
         final Container hudContainer = inventoryTracker.getHudContainer();
 
         final Item[] combinedItems = StructuredItem.emptyArray(46);
+        combinedItems[0] = hudContainer.getJavaItem(50);
         System.arraycopy(armorItems, 0, combinedItems, 5, armorItems.length);
         System.arraycopy(inventoryItems, 9, combinedItems, 9, 27);
         System.arraycopy(inventoryItems, 0, combinedItems, 36, 9);
