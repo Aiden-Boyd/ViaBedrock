@@ -23,7 +23,7 @@ jobs:
           meta=json.load(urllib.request.urlopen(version['url']))
           urllib.request.urlretrieve(meta['downloads']['client']['url'],'client.jar')
           PY
-          javap -classpath client.jar -private -c net.minecraft.client.gui.screens.multiplayer.ServerSelectionList 'net.minecraft.client.gui.screens.multiplayer.ServerSelectionList$OnlineServerEntry' net.minecraft.client.gui.components.AbstractSelectionList 'net.minecraft.client.gui.components.AbstractSelectionList$Entry' net.minecraft.client.gui.components.ObjectSelectionList net.minecraft.client.input.MouseButtonEvent > menu-bytecode.txt
+          javap -classpath client.jar -private -c net.minecraft.client.gui.screens.multiplayer.ServerSelectionList 'net.minecraft.client.gui.screens.multiplayer.ServerSelectionList$OnlineServerEntry' net.minecraft.client.gui.components.AbstractSelectionList 'net.minecraft.client.gui.components.AbstractSelectionList$Entry' net.minecraft.client.gui.components.ObjectSelectionList net.minecraft.client.input.MouseButtonEvent net.minecraft.client.input.MouseButtonInfo net.minecraft.client.gui.components.AbstractContainerWidget net.minecraft.client.gui.components.AbstractScrollArea net.minecraft.client.gui.components.AbstractWidget net.minecraft.client.gui.components.events.ContainerEventHandler net.minecraft.client.gui.components.events.GuiEventListener 'net.minecraft.client.gui.components.ObjectSelectionList$Entry' 'net.minecraft.client.gui.screens.multiplayer.ServerSelectionList$Entry' > menu-bytecode.txt
       - uses: actions/upload-artifact@v4
         with:
           name: minecraft-menu-bytecode
