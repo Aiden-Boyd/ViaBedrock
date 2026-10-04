@@ -113,6 +113,12 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
         }
         ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(fixture), Component.empty());
         this.serverSelectionList.setSelected(this.serverSelectionList.children().stream().filter(BedrockFriendEntry.class::isInstance).findFirst().orElseThrow());
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(), Component.empty());
+        if (this.serverSelectionList.getSelected() != null || this.joinButton.active) {
+            throw new AssertionError("An available friend disappearing left Join enabled");
+        }
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(fixture), Component.empty());
+        this.serverSelectionList.setSelected(this.serverSelectionList.children().stream().filter(BedrockFriendEntry.class::isInstance).findFirst().orElseThrow());
         return true;
     }
 

@@ -29,5 +29,12 @@ except subprocess.TimeoutExpired:
     raise SystemExit("Minecraft menu smoke test timed out")
 print(output[-24000:])
 if process.returncode != 0 or "BEDROCK_NATIVE_MENU_SMOKE_PASSED" not in output:
+    log = game_dir / "logs/latest.log"
+    if log.exists():
+        print("Minecraft runtime log on smoke failure:")
+        print(log.read_text(errors="replace")[-40000:])
+    for index, line in enumerate(output.splitlines()):
+        if any(marker in line for marker in ("Caused by:", "AssertionError", "Mixin apply failed", "InjectionError")):
+            print("\\n".join(output.splitlines()[index:index + 18]))
     raise SystemExit("Minecraft did not pass the native menu smoke test")
 print("Opened both native menus and verified Bedrock rows without Xbox sign-in")

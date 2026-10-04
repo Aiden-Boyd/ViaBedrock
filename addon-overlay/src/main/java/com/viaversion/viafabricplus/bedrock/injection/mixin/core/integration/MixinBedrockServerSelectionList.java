@@ -50,6 +50,7 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
     @Unique private List<FriendWorld> viaBedrock$worlds = List.of();
     @Unique private Component viaBedrock$status;
     @Unique private Object viaBedrock$account;
+    @Unique private boolean viaBedrock$hadFriendSelection;
 
     public MixinBedrockServerSelectionList(final Minecraft client, final int width, final int height, final int y, final int itemHeight) {
         super(client, width, height, y, itemHeight);
@@ -65,6 +66,11 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
         this.viaBedrock$worlds = List.copyOf(worlds);
         this.viaBedrock$status = status;
         this.refreshEntries();
+    }
+
+    @Inject(method = "refreshEntries", at = @At("HEAD"))
+    private void rememberFriendSelection(final CallbackInfo ci) {
+        this.viaBedrock$hadFriendSelection = this.getSelected() instanceof BedrockFriendEntry;
     }
 
     @ModifyArg(method = "refreshEntries", at = @At(value = "INVOKE",
@@ -83,7 +89,7 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
 
     @Inject(method = "refreshEntries", at = @At("TAIL"))
     private void clearOfflineFriendSelection(final CallbackInfo ci) {
-        if (this.getSelected() instanceof BedrockFriendEntry friend && !this.children().contains(friend)) {
+        if (this.viaBedrock$hadFriendSelection && this.getSelected() == null) {
             this.setSelected(null);
         }
     }
