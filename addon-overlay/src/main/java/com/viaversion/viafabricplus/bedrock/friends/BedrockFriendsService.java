@@ -151,7 +151,7 @@ public final class BedrockFriendsService {
                 throw BedrockXboxError.response("Xbox session join", response);
             }
             final URI sessionUri = sessionUri(response);
-            joined = new JoinedWorld(sessionUri, account, subscription);
+            joined = new JoinedWorld(sessionUri, account, subscription, xuid);
             final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
             while (System.nanoTime() < deadline) {
                 final JsonObject session = request(sessionUri, "GET", null, token);
@@ -292,11 +292,13 @@ public final class BedrockFriendsService {
         private final URI sessionUri;
         private final BedrockAuthManager account;
         private final RtaSubscription subscription;
+        private final String xuid;
         private volatile SocketAddress address;
         private volatile String nonce;
         private boolean closed;
 
-        private JoinedWorld(final URI sessionUri, final BedrockAuthManager account, final RtaSubscription subscription) {
+        private JoinedWorld(final URI sessionUri, final BedrockAuthManager account, final RtaSubscription subscription, final String xuid) {
+            this.xuid = xuid;
             this.sessionUri = sessionUri;
             this.account = account;
             this.subscription = subscription;
@@ -321,7 +323,7 @@ public final class BedrockFriendsService {
                 if (this.closed) return;
                 this.closed = true;
                 final JoinedWorld active = CURRENT_WORLD.get();
-                if (active != null && active != this && active.account == this.account && active.sessionUri.equals(this.sessionUri)) {
+                if (active != null && active != this && active.xuid.equals(this.xuid) && active.sessionUri.equals(this.sessionUri)) {
                     // An old disconnect must not remove a newer membership in the same world.
                     this.subscription.close();
                     return;

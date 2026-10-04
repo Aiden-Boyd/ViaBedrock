@@ -62,6 +62,15 @@ public abstract class MixinBedrockPermissions {
         }
     }
 
+    @Inject(method = {"useItem", "interact", "interactAt"}, at = @At("HEAD"), cancellable = true)
+    private void checkVisitorInteraction(final CallbackInfoReturnable<InteractionResult> cir) {
+        final var player = viaBedrock$player();
+        if (player != null && player.abilities().playerPermission()
+                == net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerPermissionLevel.Visitor.getValue()) {
+            cir.setReturnValue(InteractionResult.FAIL);
+        }
+    }
+
     @Inject(method = "useItemOn", at = @At("HEAD"), cancellable = true)
     private void checkBlockUse(final LocalPlayer player, final InteractionHand hand, final BlockHitResult hit,
                                final CallbackInfoReturnable<InteractionResult> cir) {
