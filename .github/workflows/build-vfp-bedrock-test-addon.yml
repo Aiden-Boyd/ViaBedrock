@@ -29,7 +29,8 @@ jobs:
         run: ./gradlew clean publishToMavenLocal
 
       - name: Clone ViaFabricPlus Bedrock
-        run: git clone --depth 1 https://github.com/ViaVersionAddons/viafabricplus-bedrock.git ../viafabricplus-bedrock
+        run: |
+          git clone --depth 1 https://github.com/ViaVersionAddons/viafabricplus-bedrock.git ../viafabricplus-bedrock
           git -C ../viafabricplus-bedrock checkout 1268aa42bf0f96c63058906e07a9cd05534565af
 
       - name: Patch addon for current ViaBedrock API and Maven Local
