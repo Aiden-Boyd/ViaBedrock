@@ -32,32 +32,21 @@ public class NetworkItemDescriptorType extends Type<ItemDescriptor> {
 
     @Override
     public ItemDescriptor read(final ByteBuf buffer) {
-        final ItemDescriptorType type = ItemDescriptorType.getByValue(buffer.readByte());
-        final ItemDescriptor result = switch (type) {
-            case COMPLEX_ALIAS -> {
-                final String name = BedrockTypes.STRING.read(buffer);
-                yield new ItemDescriptor.ComplexAliasDescriptor(name);
+        final int variant = BedrockTypes.UNSIGNED_VAR_INT.read(buffer);
+        final String kind = variant == 0 ? "empty" : BedrockTypes.STRING.read(buffer);
+        final ItemDescriptor result = switch (kind) {
+            case "empty" -> {
+                BedrockTypes.VAR_INT.read(buffer); // Empty descriptor aux value
+                yield new ItemDescriptor.InvalidDescriptor();
             }
-            case DEFAULT -> {
-                final int itemId = buffer.readShortLE();
-                final int auxValue = itemId != 0 ? buffer.readShortLE() : 0;
-                yield new ItemDescriptor.DefaultDescriptor(itemId, auxValue);
+            case "name" -> new ItemDescriptor.DeferredDescriptor(BedrockTypes.STRING.read(buffer), BedrockTypes.VAR_INT.read(buffer));
+            case "item_tag" -> {
+                final String tag = BedrockTypes.STRING.read(buffer);
+                BedrockTypes.VAR_INT.read(buffer); // Tag aux value
+                yield new ItemDescriptor.ItemTagDescriptor(tag);
             }
-            case DEFERRED -> {
-                final String fullName = BedrockTypes.STRING.read(buffer);
-                final int auxValue = buffer.readIntLE();
-                yield new ItemDescriptor.DeferredDescriptor(fullName, auxValue);
-            }
-            case INVALID -> new ItemDescriptor.InvalidDescriptor();
-            case ITEM_TAG -> {
-                final String itemTag = BedrockTypes.STRING.read(buffer);
-                yield new ItemDescriptor.ItemTagDescriptor(itemTag);
-            }
-            case MOLANG -> {
-                final String tagExpression = BedrockTypes.STRING.read(buffer);
-                final int molangVersion = buffer.readUnsignedByte();
-                yield new ItemDescriptor.MolangDescriptor(tagExpression, molangVersion);
-            }
+            case "molang" -> new ItemDescriptor.MolangDescriptor(BedrockTypes.STRING.read(buffer), buffer.readUnsignedShortLE());
+            default -> throw new IllegalArgumentException("Unknown ingredient descriptor: " + kind);
         };
 
         final int amount = BedrockTypes.VAR_INT.read(buffer);
@@ -67,36 +56,28 @@ public class NetworkItemDescriptorType extends Type<ItemDescriptor> {
 
     @Override
     public void write(final ByteBuf buffer, final ItemDescriptor value) {
-        buffer.writeByte(value.getType().getValue());
+        BedrockTypes.UNSIGNED_VAR_INT.write(buffer, value.getType() == ItemDescriptorType.INVALID ? 0 : 1);
         switch (value.getType()) {
-            case COMPLEX_ALIAS -> {
-                final ItemDescriptor.ComplexAliasDescriptor descriptor = (ItemDescriptor.ComplexAliasDescriptor) value;
-                BedrockTypes.STRING.write(buffer, descriptor.name());
-            }
-            case DEFAULT -> {
-                final ItemDescriptor.DefaultDescriptor descriptor = (ItemDescriptor.DefaultDescriptor) value;
-                buffer.writeShortLE(descriptor.itemId());
-                if (descriptor.itemId() != 0) {
-                    buffer.writeShortLE(descriptor.auxValue());
-                }
-            }
+            case INVALID -> BedrockTypes.VAR_INT.write(buffer, Short.MAX_VALUE);
             case DEFERRED -> {
                 final ItemDescriptor.DeferredDescriptor descriptor = (ItemDescriptor.DeferredDescriptor) value;
+                BedrockTypes.STRING.write(buffer, "name");
                 BedrockTypes.STRING.write(buffer, descriptor.fullName());
-                buffer.writeIntLE(descriptor.auxValue());
-            }
-            case INVALID -> {
-                // Nothing to write
+                BedrockTypes.VAR_INT.write(buffer, descriptor.auxValue());
             }
             case ITEM_TAG -> {
                 final ItemDescriptor.ItemTagDescriptor descriptor = (ItemDescriptor.ItemTagDescriptor) value;
+                BedrockTypes.STRING.write(buffer, "item_tag");
                 BedrockTypes.STRING.write(buffer, descriptor.itemTag());
+                BedrockTypes.VAR_INT.write(buffer, Short.MAX_VALUE);
             }
             case MOLANG -> {
                 final ItemDescriptor.MolangDescriptor descriptor = (ItemDescriptor.MolangDescriptor) value;
+                BedrockTypes.STRING.write(buffer, "molang");
                 BedrockTypes.STRING.write(buffer, descriptor.tagExpression());
-                buffer.writeByte(descriptor.molangVersion());
+                buffer.writeShortLE(descriptor.molangVersion());
             }
+            default -> throw new UnsupportedOperationException("Ingredient requires a name: " + value.getType());
         }
         BedrockTypes.VAR_INT.write(buffer, value.amount());
     }
