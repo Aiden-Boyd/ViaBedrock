@@ -33,6 +33,12 @@ public final class InventoryCodecSelfTest {
         checkAction(new ItemStackRequestAction.SwapAction(source, cursor), "02021c00002a0000003b000000000000");
         checkAction(new ItemStackRequestAction.BeaconPaymentAction(1, 2), "080a0204");
         checkAction(new ItemStackRequestAction.MineBlockAction(0, 0, 42), "090b00002a000000");
+        checkAction(new ItemStackRequestAction.CraftRecipeAction(7, 1), "0a0c0701");
+        checkAction(new ItemStackRequestAction.ConsumeAction(1, new ItemStackRequestSlotInfo(
+                new FullContainerName(ContainerEnumName.CraftingInputContainer, null), (byte) 28, 42)), "0505010d001c2a000000");
+        checkAction(new ItemStackRequestAction.TakeAction(4, new ItemStackRequestSlotInfo(
+                new FullContainerName(ContainerEnumName.CreatedOutputContainer, null), (byte) 50, -1), cursor),
+                "0000043c0032ffffffff3b000000000000");
 
         final ByteBuf slots = fixture("000001015400000000000000000000");
         try {
