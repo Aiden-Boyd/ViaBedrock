@@ -38,7 +38,10 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
 
     @Override
     public void write(final ByteBuf buffer, final ItemStackRequestAction value) {
-        buffer.writeByte(value.getType().getValue());
+        // The variant index excludes the two retired container actions; the payload retains the legacy type.
+        final int actionType = value.getType().getValue();
+        BedrockTypes.UNSIGNED_VAR_INT.write(buffer, actionType >= 9 ? actionType - 2 : actionType);
+        buffer.writeByte(actionType);
         switch (value.getType()) {
             case Take -> {
                 final ItemStackRequestAction.TakeAction takeAction = (ItemStackRequestAction.TakeAction) value;
@@ -121,7 +124,7 @@ public class ItemStackActionType extends Type<ItemStackRequestAction> {
 
                 BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.hotbarSlot());
                 BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.predictedDurability());
-                BedrockTypes.VAR_INT.write(buffer, hudMineBlockAction.stackNetworkId());
+                BedrockTypes.INT_LE.write(buffer, hudMineBlockAction.stackNetworkId());
             }
             case CraftRepairAndDisenchant -> {
                 final ItemStackRequestAction.CraftGrindstoneAction craftGrindstoneAction = (ItemStackRequestAction.CraftGrindstoneAction) value;
