@@ -1,5 +1,12 @@
 package net.raphimc.viabedrock.tool.inventory;
 
+import com.viaversion.viaversion.api.connection.UserConnection;
+import net.raphimc.viabedrock.api.model.container.block.CraftingTableContainer;
+import net.raphimc.viabedrock.api.model.container.block.StonecutterContainer;
+import net.raphimc.viabedrock.protocol.storage.CraftingDataTracker;
+import net.raphimc.viabedrock.protocol.storage.CraftingDataStorage;
+import java.lang.reflect.Proxy;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
@@ -62,7 +69,50 @@ public final class InventoryCodecSelfTest {
             responses.release();
         }
         checkCrafting();
+        checkVirtualContainers();
         System.out.println("Inventory protocol 2193 and crafting fixtures passed");
+    }
+
+    private static void checkVirtualContainers() {
+        final CraftingDataTracker[] tracker = new CraftingDataTracker[1];
+        final UserConnection user = (UserConnection) Proxy.newProxyInstance(UserConnection.class.getClassLoader(),
+                new Class<?>[]{UserConnection.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("get") && arguments[0] == CraftingDataTracker.class) {
+                        return tracker[0];
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                });
+        tracker[0] = new CraftingDataTracker(user);
+        final StonecutterContainer stonecutter = new StonecutterContainer(user, (byte) 1, null, null);
+        if (!stonecutter.setItems(BedrockItem.emptyArray(2)) || !stonecutter.setItems(BedrockItem.emptyArray(54))
+                || stonecutter.bedrockSlot(0) != 3 || stonecutter.bedrockSlot(1) != 50
+                || stonecutter.handleButtonClick(-1) || stonecutter.handleButtonClick(0)) {
+            throw new AssertionError("Stonecutter compact/UI updates or recipe bounds failed");
+        }
+        final CraftingTableContainer table = new CraftingTableContainer(user, (byte) 2, null, null);
+        if (!table.setItems(BedrockItem.emptyArray(10)) || !table.setItems(BedrockItem.emptyArray(54))) {
+            throw new AssertionError("Crafting table compact/UI updates failed");
+        }
+        for (int slot = 0; slot < table.size(); slot++) {
+            if (table.javaSlot(table.bedrockSlot(slot)) != slot) {
+                throw new AssertionError("Crafting grid slot mapping failed");
+            }
+        }
+        final BedrockItem input = new BedrockItem(1);
+        input.setAmount(3);
+        final BedrockItem output = new BedrockItem(2);
+        output.setAmount(4);
+        final ShapedRecipe recipe = new ShapedRecipe("table", new UUID(0, 0), "crafting_table", 0,
+                new ItemDescriptor[][]{{new ItemDescriptor.DefaultDescriptor(1, 0)}}, List.of(output), false);
+        tracker[0].updateCraftingDataList(List.of(new CraftingDataStorage(RecipeType.SHAPED, 7, recipe)));
+        table.setItem(40, input);
+        if (table.getItem(50).amount() != 4 || output.amount() != 4) {
+            throw new AssertionError("Crafting table preview did not update");
+        }
+        table.setItem(40, BedrockItem.empty());
+        if (!table.getItem(50).isEmpty()) {
+            throw new AssertionError("Crafting table retained a stale output");
+        }
     }
 
     private static void checkCrafting() {
