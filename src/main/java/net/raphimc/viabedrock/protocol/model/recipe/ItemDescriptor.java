@@ -127,8 +127,11 @@ public interface ItemDescriptor {
 
         @Override
         public boolean matchesItem(final UserConnection user, final BedrockItem item) {
-            // TODO
-            return false;
+            if (item.isEmpty() || item.amount() < this.amount) {
+                return false;
+            }
+            final Integer itemId = user.get(ItemRewriter.class).getItems().get(this.fullName);
+            return itemId != null && item.identifier() == itemId && ItemDescriptor.matchesAuxValue(this.auxValue, item);
         }
 
         @Override
