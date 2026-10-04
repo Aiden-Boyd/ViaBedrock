@@ -90,10 +90,10 @@ public abstract class MixinBedrockRealmInvite {
                 } else if (error != null) {
                     this.viaBedrock$failed(BedrockRealmsError.describe(error));
                 } else {
-                    if (this.lastScreen instanceof BedrockRealmRows rows) {
+                    this.onJoin.run();
+                    if (client.gui.screen() instanceof BedrockRealmRows rows) {
                         rows.viaBedrock$acceptedRealm(new BedrockRealmDiscovery.World(account, realm, service));
                     }
-                    this.onJoin.run();
                 }
             }, client);
         });
