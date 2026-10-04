@@ -24,6 +24,7 @@ import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 
 import net.raphimc.viabedrock.api.model.entity.Entity;
+import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.api.model.entity.BoatEntity;
 import net.raphimc.viabedrock.protocol.model.Position2f;
 import java.util.List;
@@ -97,6 +98,23 @@ public final class PlayerActionPacketFactory {
             setPassengersPacket.write(Types.VAR_INT, passengerId); // passenger id
         }
         setPassengersPacket.send(BedrockProtocol.class);
+    }
+
+    public static void writeAuthInputBlockActions(final PacketWrapper wrapper, final List<ClientPlayerEntity.AuthInputBlockAction> actions) {
+        wrapper.write(BedrockTypes.VAR_INT, actions.size()); // signed action count
+        for (ClientPlayerEntity.AuthInputBlockAction action : actions) {
+            wrapper.write(BedrockTypes.VAR_INT, action.action().getValue());
+            switch (action.action()) {
+                case StopDestroyBlock -> {
+                    // Stop has no position or face payload.
+                }
+                case StartDestroyBlock, AbortDestroyBlock, CrackBlock, PredictDestroyBlock, ContinueDestroyBlock -> {
+                    wrapper.write(BedrockTypes.BLOCK_POSITION, Objects.requireNonNull(action.position(), "block action position"));
+                    wrapper.write(BedrockTypes.VAR_INT, action.direction());
+                }
+                default -> throw new IllegalArgumentException("Unsupported auth-input block action: " + action.action());
+            }
+        }
     }
 
     private PlayerActionPacketFactory() {

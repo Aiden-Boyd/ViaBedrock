@@ -347,7 +347,7 @@ public final class ClientPlayerPackets {
 
                     if (clientPlayer.javaGameMode() == GameMode.CREATIVE) {
                         clientPlayer.setBlockBreakingInfo(null);
-                        clientPlayer.addAuthInputBlockAction(new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CreativeDestroyBlock, position, direction.ordinal()));
+                        clientPlayer.sendPlayerActionPacketToServer(PlayerActionType.CreativeDestroyBlock, position, direction.ordinal());
                         chunkTracker.handleBlockChange(position, 0, chunkTracker.bedrockAirId());
                         PacketFactory.sendJavaBlockUpdate(wrapper.user(), position, ProtocolConstants.JAVA_AIR_ID);
                     } else {
@@ -667,12 +667,7 @@ public final class ClientPlayerPackets {
             final boolean hasBlockActions = clientPlayer.authInputData().contains(PlayerAuthInputData.PerformBlockActions);
             wrapper.write(Types.BOOLEAN, hasBlockActions);
             if (hasBlockActions) {
-                wrapper.write(BedrockTypes.UNSIGNED_VAR_INT, clientPlayer.authInputBlockActions().size()); // player block actions count
-                for (ClientPlayerEntity.AuthInputBlockAction blockAction : clientPlayer.authInputBlockActions()) {
-                    wrapper.write(BedrockTypes.VAR_INT, blockAction.action().getValue()); // action
-                    wrapper.write(BedrockTypes.BLOCK_POSITION, blockAction.position() != null ? blockAction.position() : new BlockPosition(0, 0, 0)); // position
-                    wrapper.write(BedrockTypes.VAR_INT, blockAction.direction()); // facing
-                }
+                PlayerActionPacketFactory.writeAuthInputBlockActions(wrapper, clientPlayer.authInputBlockActions());
             }
             PlayerActionPacketFactory.writePredictedVehicle(wrapper, boat);
             wrapper.write(BedrockTypes.POSITION_2F, new Position2f(0F, 0F)); // analog move vector
