@@ -24,7 +24,7 @@ import com.viaversion.viaversion.protocol.packet.PacketWrapperImpl;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthInputData;
 import net.raphimc.viabedrock.protocol.data.enums.java.Relative;
-import net.raphimc.viabedrock.protocol.data.enums.java.generated.InputFlag;
+import net.raphimc.viabedrock.protocol.data.enums.java.InputFlag;
 import net.raphimc.viabedrock.protocol.model.PlayerAbilities;
 import net.raphimc.viabedrock.protocol.model.Position3f;
 import org.junit.jupiter.api.BeforeAll;
