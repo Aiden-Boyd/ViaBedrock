@@ -30,7 +30,7 @@ class DisconnectHandlerTest {
     @Test
     void disconnectNotificationIsFollowedByCloseEvenWhenTransportRemainsActive() {
         final int[] notifications = new int[1];
-        final EmbeddedChannel channel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+        final EmbeddedChannel channel = new EmbeddedChannel(true, true, new ChannelOutboundHandlerAdapter() {
             @Override
             public void disconnect(final ChannelHandlerContext ctx, final ChannelPromise promise) {
                 notifications[0]++;
@@ -49,7 +49,7 @@ class DisconnectHandlerTest {
 
     @Test
     void failedNotificationStillReleasesTheChannel() {
-        final EmbeddedChannel channel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+        final EmbeddedChannel channel = new EmbeddedChannel(true, true, new ChannelOutboundHandlerAdapter() {
             @Override
             public void disconnect(final ChannelHandlerContext ctx, final ChannelPromise promise) {
                 promise.setFailure(new IllegalStateException("Notification failed"));

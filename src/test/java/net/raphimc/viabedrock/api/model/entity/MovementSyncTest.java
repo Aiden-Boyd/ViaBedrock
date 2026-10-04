@@ -88,6 +88,8 @@ class MovementSyncTest {
                 resyncs[0]++;
             }
         };
+        player.setPosition(new Position3f(0, 64, 0));
+        player.setRotation(new Position3f(0, 0, 0));
         player.updatePlayerPosition(45F, 0F, (short) 0);
         player.updatePlayerPosition((short) 0);
         assertEquals(0, resyncs[0]);
@@ -102,7 +104,10 @@ class MovementSyncTest {
     }
 
     private static ClientPlayerEntity player() {
-        return new ClientPlayerEntity(user(), 1, UUID.randomUUID(), abilities());
+        final ClientPlayerEntity player = new ClientPlayerEntity(user(), 1, UUID.randomUUID(), abilities());
+        player.setPosition(new Position3f(0, 64, 0));
+        player.setRotation(new Position3f(0, 0, 0));
+        return player;
     }
 
     private static PlayerAbilities abilities() {
