@@ -7,6 +7,7 @@ import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.protocol.types.InventoryTypes;
+import net.raphimc.viabedrock.protocol.types.inventory.ItemStackSlotResponseType;
 
 import java.util.HexFormat;
 
@@ -27,8 +28,8 @@ public final class InventoryCodecSelfTest {
 
         final ByteBuf slots = fixture("000001015400000000000000000000");
         try {
-            final var first = new net.raphimc.viabedrock.protocol.types.inventory.ItemStackSlotResponseType().read(slots);
-            final var second = new net.raphimc.viabedrock.protocol.types.inventory.ItemStackSlotResponseType().read(slots);
+            final var first = new ItemStackSlotResponseType().read(slots);
+            final var second = new ItemStackSlotResponseType().read(slots);
             if (first.itemNetId() != 42 || first.amount() != 1 || first.filteredCustomName() != null || second.itemNetId() != 0 || slots.isReadable()) {
                 throw new AssertionError("Optional slot fields lost alignment");
             }
