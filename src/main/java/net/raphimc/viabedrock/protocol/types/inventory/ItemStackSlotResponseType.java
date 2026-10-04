@@ -34,9 +34,9 @@ public class ItemStackSlotResponseType extends Type<ItemStackResponseSlotInfo> {
         final byte requestedSlot = buffer.readByte();
         final byte slot = buffer.readByte();
         final byte amount = buffer.readByte();
-        final int itemNetId = BedrockTypes.VAR_INT.read(buffer);
+        final int itemNetId = buffer.readBoolean() ? BedrockTypes.VAR_INT.read(buffer) : 0;
         final String customName = BedrockTypes.STRING.read(buffer);
-        final String filteredCustomName = BedrockTypes.STRING.read(buffer);
+        final String filteredCustomName = buffer.readBoolean() ? BedrockTypes.STRING.read(buffer) : null;
         final int durability = BedrockTypes.VAR_INT.read(buffer);
 
         return new ItemStackResponseSlotInfo(requestedSlot, slot, amount, itemNetId, customName, filteredCustomName, durability);
@@ -47,9 +47,15 @@ public class ItemStackSlotResponseType extends Type<ItemStackResponseSlotInfo> {
         buffer.writeByte(value.requestedSlot());
         buffer.writeByte(value.slot());
         buffer.writeByte(value.amount());
-        BedrockTypes.VAR_INT.write(buffer, value.itemNetId());
+        buffer.writeBoolean(value.itemNetId() > 0);
+        if (value.itemNetId() > 0) {
+            BedrockTypes.VAR_INT.write(buffer, value.itemNetId());
+        }
         BedrockTypes.STRING.write(buffer, value.customName());
-        BedrockTypes.STRING.write(buffer, value.filteredCustomName());
+        buffer.writeBoolean(value.filteredCustomName() != null);
+        if (value.filteredCustomName() != null) {
+            BedrockTypes.STRING.write(buffer, value.filteredCustomName());
+        }
         BedrockTypes.VAR_INT.write(buffer, value.durability());
     }
 
