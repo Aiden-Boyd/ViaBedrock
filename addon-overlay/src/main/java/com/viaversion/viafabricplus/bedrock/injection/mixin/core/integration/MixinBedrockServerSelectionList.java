@@ -68,7 +68,6 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
         if (this.viaBedrock$status == null) {
             return;
         }
-        this.viaBedrock$add(new BedrockFriendEntry(this.screen, (ServerSelectionList) (Object) this, null, this.viaBedrock$status));
         for (FriendWorld world : this.viaBedrock$worlds) {
             this.viaBedrock$add(new BedrockFriendEntry(this.screen, (ServerSelectionList) (Object) this, world, Component.empty()));
         }

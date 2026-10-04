@@ -75,25 +75,27 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, Be
 
     @Override
     public boolean viaBedrock$hasMenuRows() {
-        final var row = this.realmSelectionList.children().stream().filter(BedrockRealmEntry.class::isInstance).findFirst();
-        if (row.isEmpty()) {
-            return false;
+        if (!this.viaBedrock$realms().isEmpty() ||
+            this.realmSelectionList.children().stream().anyMatch(BedrockRealmEntry.class::isInstance)) {
+            throw new AssertionError("Empty Bedrock Realms must not add a placeholder row");
         }
-        this.realmSelectionList.setSelected(row.get());
+        // Exercise the native renderer and selection with display-only CI data.
+        final var data = new BedrockRealmData(Long.MIN_VALUE, null, null, null, Component.empty());
+        data.name = "Menu QA Realm";
+        data.motd = "Native Realm row";
+        data.owner = "Menu QA";
+        final var entry = new BedrockRealmEntry((RealmsMainScreen) (Object) this, data);
+        this.realmSelectionList.children().add(entry);
+        this.updateLayout(RealmsMainScreen.LayoutState.LIST);
+        this.realmSelectionList.setSelected(entry);
         return this.playButton.active && !this.configureButton.active && !this.renewButton.active && !this.leaveButton.active;
     }
 
     @Override
     public List<BedrockRealmData> viaBedrock$realms() {
         final BedrockAuthManager account = ViaFabricPlusBedrock.impl().account().get();
-        final String key = account == null ? "bedrock_menu.viafabricplus.sign_in_realms"
-            : this.viaBedrock$worlds.loading() ? "bedrock_menu.viafabricplus.loading_realms"
-            : this.viaBedrock$worlds.error() != null ? "bedrock_menu.viafabricplus.realms_error"
-            : this.viaBedrock$worlds.worlds().isEmpty() ? "bedrock_menu.viafabricplus.no_realms"
-            : "bedrock_menu.viafabricplus.manage_realms";
         final List<BedrockRealmData> rows = new ArrayList<>();
         long id = Long.MIN_VALUE;
-        rows.add(new BedrockRealmData(id++, account, null, null, Component.translatable(key)));
         for (World world : this.viaBedrock$worlds.worlds()) {
             if (world.account() == account) {
                 rows.add(new BedrockRealmData(id++, world.account(), world.realm(), world.service(), Component.empty()));
@@ -104,13 +106,17 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, Be
 
     @Inject(method = "updateLayout()V", at = @At("HEAD"), cancellable = true)
     private void showCombinedRealmList(final CallbackInfo ci) {
-        this.updateLayout(RealmsMainScreen.LayoutState.LIST);
-        ci.cancel();
+        if (!this.viaBedrock$realms().isEmpty()) {
+            this.updateLayout(RealmsMainScreen.LayoutState.LIST);
+            ci.cancel();
+        }
     }
 
     @Inject(method = "openPdpIfNoRealms", at = @At("HEAD"), cancellable = true)
     private void retainBedrockRealmList(final CallbackInfo ci) {
-        ci.cancel();
+        if (this.viaBedrock$worlds.loading() || !this.viaBedrock$realms().isEmpty()) {
+            ci.cancel();
+        }
     }
 
     @Inject(method = "updateButtonStates", at = @At("TAIL"))

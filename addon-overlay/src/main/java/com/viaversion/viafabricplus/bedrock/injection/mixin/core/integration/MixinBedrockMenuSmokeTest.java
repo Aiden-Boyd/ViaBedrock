@@ -41,6 +41,7 @@ public abstract class MixinBedrockMenuSmokeTest {
     @Unique private static final boolean VIA_BEDROCK_MENU_SMOKE = Boolean.getBoolean("viaBedrock.menuSmoke");
     @Unique private int viaBedrock$smokeTicks;
     @Unique private int viaBedrock$smokePhase;
+    @Unique private int viaBedrock$smokeWait;
     @Unique private Screen viaBedrock$smokeScreen;
     @Unique private Screen viaBedrock$smokeParent;
 
@@ -64,16 +65,27 @@ public abstract class MixinBedrockMenuSmokeTest {
             this.viaBedrock$smokePhase = 1;
         } else if (this.viaBedrock$smokePhase == 1) {
             if (!((BedrockMenuSmokeAccess) this.viaBedrock$smokeScreen).viaBedrock$hasMenuRows()) {
-                throw new AssertionError("Native Multiplayer screen has no Bedrock friends row");
+                throw new AssertionError("Native Multiplayer empty state or friend selection failed");
+            }
+            this.viaBedrock$smokePhase = 2;
+            this.viaBedrock$smokeWait = 0;
+        } else if (this.viaBedrock$smokePhase == 2) {
+            if (++this.viaBedrock$smokeWait < 10) {
+                return;
             }
             this.viaBedrock$smokeScreen = new RealmsMainScreen(this.viaBedrock$smokeParent);
             client.gui.setScreen(this.viaBedrock$smokeScreen);
-            this.viaBedrock$smokePhase = 2;
-        } else if (this.viaBedrock$smokePhase == 2) {
-            if (!((BedrockMenuSmokeAccess) this.viaBedrock$smokeScreen).viaBedrock$hasMenuRows()) {
-                throw new AssertionError("Native Realms screen has no Bedrock Realm row");
-            }
             this.viaBedrock$smokePhase = 3;
+        } else if (this.viaBedrock$smokePhase == 3) {
+            if (!((BedrockMenuSmokeAccess) this.viaBedrock$smokeScreen).viaBedrock$hasMenuRows()) {
+                throw new AssertionError("Native Realms empty state or Realm selection failed");
+            }
+            this.viaBedrock$smokePhase = 4;
+            this.viaBedrock$smokeWait = 0;
+        } else if (this.viaBedrock$smokePhase == 4) {
+            if (++this.viaBedrock$smokeWait < 10) {
+                return;
+            }
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_NATIVE_MENU_SMOKE_PASSED");
             client.stop();
         }

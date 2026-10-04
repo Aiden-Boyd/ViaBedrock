@@ -32,6 +32,8 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 public final class BedrockFriendEntry extends ServerSelectionList.Entry {
 
@@ -69,15 +71,23 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
     public void extractContent(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY,
                                final boolean hovered, final float delta) {
         final var font = Minecraft.getInstance().font;
-        final int x = this.getContentX() + 4;
-        final int y = this.getContentY() + 5;
-        final int width = this.getContentWidth() - 8;
-        final String count = this.world == null ? "" : this.world.players() + "/" + this.world.maxPlayers();
-        final String name = this.world == null ? "Xbox friends" : this.world.worldName();
-        final String detail = this.world == null ? this.status.getString() : this.world.hostName() + " • Bedrock " + this.world.version();
-        graphics.text(font, font.plainSubstrByWidth(name, Math.max(0, width - font.width(count) - 12)), x, y, 0xFF58A6FF);
-        graphics.text(font, count, x + width - font.width(count), y, -1);
-        graphics.text(font, font.plainSubstrByWidth(detail, width), x, y + font.lineHeight + 3, 0xFFB8B8B8);
+        final int left = this.getContentX();
+        final int y = this.getContentY();
+        final int x = left + 35;
+        final int width = Math.max(0, this.getContentWidth() - 35);
+        final String count = this.world.maxPlayers() > 0 ? this.world.players() + "/" + this.world.maxPlayers()
+            : Integer.toString(this.world.players());
+        graphics.blit(RenderPipelines.GUI_TEXTURED, Identifier.withDefaultNamespace("textures/misc/unknown_server.png"),
+            left, y, 0, 0, 32, 32, 32, 32);
+        graphics.text(font, font.plainSubstrByWidth(this.world.worldName(),
+            Math.max(0, width - font.width(count) - 8)), x, y + 1, -1);
+        graphics.text(font, count, x + width - font.width(count), y + 1, 0xFFAAAAAA);
+        graphics.text(font, font.plainSubstrByWidth(this.world.hostName(), width), x, y + 12, 0xFF808080);
+        graphics.text(font, font.plainSubstrByWidth("Bedrock " + this.world.version(), width), x, y + 23, 0xFF808080);
+        if (hovered) {
+            graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.withDefaultNamespace("server_list/join"),
+                left, y, 32, 32);
+        }
     }
 
     @Override
@@ -86,7 +96,7 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
             return false;
         }
         this.list.setSelected(this);
-        if (doubleClick) {
+        if (doubleClick || event.x() - this.getContentX() < 32) {
             this.join();
         }
         return true;

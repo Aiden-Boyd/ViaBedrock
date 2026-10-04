@@ -44,23 +44,4 @@ public final class BedrockRealmEntry extends RealmsMainScreen.ServerEntry {
         return Component.literal(this.data.name + ", Bedrock Realms, " + this.data.motd);
     }
 
-    @Override
-    public void extractContent(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY,
-                               final boolean hovered, final float delta) {
-        final var font = Minecraft.getInstance().font;
-        final int x = this.getContentX() + 4;
-        final int y = this.getContentY() + 2;
-        final int width = this.getContentWidth() - 8;
-        final String label = this.data.bedrock == null ? "" : this.data.expired ? "Expired"
-            : this.data.state == com.mojang.realmsclient.dto.RealmsServer.State.CLOSED ? "Closed"
-            : !this.data.isCompatible() ? "Incompatible" : "Bedrock";
-        graphics.text(font, font.plainSubstrByWidth(this.data.name == null ? "Bedrock Realm" : this.data.name,
-            Math.max(0, width - font.width(label) - 12)), x, y, 0xFF58A6FF);
-        graphics.text(font, label, x + width - font.width(label), y, 0xFFB8B8B8);
-        final String detail = this.data.bedrock == null ? this.data.motd : this.data.owner + " • " + this.data.activeVersion;
-        graphics.text(font, font.plainSubstrByWidth(detail == null ? "" : detail, width), x, y + font.lineHeight + 2, 0xFFB8B8B8);
-        if (this.data.bedrock != null && this.data.motd != null) {
-            graphics.text(font, font.plainSubstrByWidth(this.data.motd, width), x, y + (font.lineHeight + 2) * 2, -1);
-        }
-    }
 }

@@ -83,6 +83,11 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
 
     @Override
     public boolean viaBedrock$hasMenuRows() {
+        if (this.serverSelectionList.children().stream().anyMatch(BedrockFriendEntry.class::isInstance)) {
+            throw new AssertionError("Empty Xbox friends must not add a placeholder row");
+        }
+        final var fixture = new FriendWorld("menu-qa", "0", "Menu QA", "Menu QA World", "26.3", 1, 8, 0, null);
+        ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(fixture), Component.empty());
         final var row = this.serverSelectionList.children().stream().filter(BedrockFriendEntry.class::isInstance).findFirst();
         if (row.isEmpty()) {
             return false;
