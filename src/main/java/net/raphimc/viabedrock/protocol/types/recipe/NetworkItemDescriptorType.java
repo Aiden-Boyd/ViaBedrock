@@ -58,7 +58,7 @@ public class NetworkItemDescriptorType extends Type<ItemDescriptor> {
     public void write(final ByteBuf buffer, final ItemDescriptor value) {
         BedrockTypes.UNSIGNED_VAR_INT.write(buffer, value.getType() == ItemDescriptorType.INVALID ? 0 : 1);
         switch (value.getType()) {
-            case INVALID -> BedrockTypes.VAR_INT.write(buffer, Short.MAX_VALUE);
+            case INVALID -> BedrockTypes.VAR_INT.write(buffer, (int) Short.MAX_VALUE);
             case DEFERRED -> {
                 final ItemDescriptor.DeferredDescriptor descriptor = (ItemDescriptor.DeferredDescriptor) value;
                 BedrockTypes.STRING.write(buffer, "name");
@@ -69,7 +69,7 @@ public class NetworkItemDescriptorType extends Type<ItemDescriptor> {
                 final ItemDescriptor.ItemTagDescriptor descriptor = (ItemDescriptor.ItemTagDescriptor) value;
                 BedrockTypes.STRING.write(buffer, "item_tag");
                 BedrockTypes.STRING.write(buffer, descriptor.itemTag());
-                BedrockTypes.VAR_INT.write(buffer, Short.MAX_VALUE);
+                BedrockTypes.VAR_INT.write(buffer, (int) Short.MAX_VALUE);
             }
             case MOLANG -> {
                 final ItemDescriptor.MolangDescriptor descriptor = (ItemDescriptor.MolangDescriptor) value;
