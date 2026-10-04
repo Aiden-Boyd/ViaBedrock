@@ -35,6 +35,7 @@ import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 import net.raphimc.viabedrock.protocol.types.entitydata.EntityDataTypesBedrock;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +52,12 @@ class EntityTranslationTest {
 
     private Object previousDataTypes;
     private Object previousJavaFields;
+
+    @BeforeAll
+    static void initializeVersionedTypes() throws ClassNotFoundException {
+        // Match ViaVersion's initialization order: the legacy keys initialize VersionedTypes.
+        Class.forName("com.viaversion.viaversion.api.minecraft.data.StructuredDataKey");
+    }
 
     @BeforeEach
     void setUp() throws Exception {
