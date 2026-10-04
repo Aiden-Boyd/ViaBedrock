@@ -35,6 +35,15 @@ public final class BedrockRealmEntry extends RealmsMainScreen.ServerEntry {
         this.data = data;
     }
 
+    @Override
+    public void extractContent(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY,
+                               final boolean hovered, final float delta) {
+        super.extractContent(graphics, mouseX, mouseY, hovered, delta);
+        final var texture = RealmOwnerHeads.get(this.data);
+        graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, texture,
+            this.getContentX(), this.getContentY(), 0, 0, 32, 32, 32, 32);
+    }
+
     public String key() {
         return this.data.key();
     }
