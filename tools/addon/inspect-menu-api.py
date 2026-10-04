@@ -19,6 +19,7 @@ for jar in root.rglob("*.jar"):
                     "net/minecraft/client/gui/screens/multiplayer/JoinMultiplayerScreen.class",
                     "net/minecraft/client/multiplayer/ServerData.class",
                     "net/minecraft/client/multiplayer/ServerList.class",
+                    "net/minecraft/client/Minecraft.class",
                     "net/minecraft/client/input/KeyEvent.class",
                     "net/minecraft/client/input/MouseButtonEvent.class",
                 ])]

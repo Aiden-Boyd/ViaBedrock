@@ -27,6 +27,8 @@ import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService.Friend
 import com.viaversion.viafabricplus.bedrock.integration.AccountWorldList;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockMenuJoiner;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockServerList;
+import com.viaversion.viafabricplus.bedrock.integration.BedrockMenuSmokeAccess;
+import com.viaversion.viafabricplus.bedrock.integration.BedrockFriendEntry;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +45,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(JoinMultiplayerScreen.class)
-public abstract class MixinBedrockFriendsInMultiplayer {
+public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmokeAccess {
 
     @Shadow protected ServerSelectionList serverSelectionList;
     @Unique private final AccountWorldList<FriendWorld> viaBedrock$friends = new AccountWorldList<>();
@@ -64,6 +66,11 @@ public abstract class MixinBedrockFriendsInMultiplayer {
     private void initializeFriendRows(final CallbackInfo ci) {
         this.refreshFriends(ci);
         this.viaBedrock$updateList();
+    }
+
+    @Override
+    public boolean viaBedrock$hasMenuRows() {
+        return this.serverSelectionList.children().stream().anyMatch(BedrockFriendEntry.class::isInstance);
     }
 
     @Unique

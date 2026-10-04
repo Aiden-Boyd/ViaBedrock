@@ -31,6 +31,7 @@ import net.minecraft.client.gui.screens.multiplayer.ServerSelectionList;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
 import org.lwjgl.glfw.GLFW;
+import net.raphimc.minecraftauth.bedrock.BedrockAuthManager;
 import net.minecraft.network.chat.Component;
 
 public final class BedrockFriendEntry extends ServerSelectionList.Entry {
@@ -39,6 +40,7 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
     private final ServerSelectionList list;
     private final FriendWorld world;
     private final Component status;
+    private final BedrockAuthManager account;
 
     public BedrockFriendEntry(final JoinMultiplayerScreen screen, final ServerSelectionList list,
                               final FriendWorld world, final Component status) {
@@ -46,6 +48,7 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
         this.list = list;
         this.world = world;
         this.status = status;
+        this.account = ViaFabricPlusBedrock.impl().account().get();
     }
 
     public String key() {
@@ -102,6 +105,9 @@ public final class BedrockFriendEntry extends ServerSelectionList.Entry {
     @Override
     public void join() {
         if (this.world != null) {
+            if (this.account != ViaFabricPlusBedrock.impl().account().get()) {
+                return;
+            }
             BedrockMenuJoiner.joinFriend(this.screen, this.world);
         } else if (ViaFabricPlusBedrock.impl().account().get() == null) {
             ViaFabricPlusBedrock.impl().account().login();

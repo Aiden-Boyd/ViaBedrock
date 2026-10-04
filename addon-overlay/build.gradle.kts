@@ -36,3 +36,9 @@ tasks.test {
     useJUnitPlatform()
     testLogging { exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }
+
+if (System.getenv("VIA_BEDROCK_MENU_SMOKE") == "true") {
+    tasks.named<JavaExec>("runClient") {
+        systemProperty("viaBedrock.menuSmoke", "true")
+    }
+}

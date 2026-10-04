@@ -88,6 +88,11 @@ jobs:
         working-directory: ../viafabricplus-bedrock
         run: ./gradlew clean build --refresh-dependencies
 
+      - name: Open Multiplayer and Realms in a development client
+        working-directory: ../viafabricplus-bedrock
+        timeout-minutes: 5
+        run: python3 ../ViaBedrock/tools/addon/smoke-menu-client.py
+
       - name: Inspect Minecraft menu APIs
         working-directory: ../viafabricplus-bedrock
         run: |

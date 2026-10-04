@@ -55,7 +55,8 @@
     "core.integration.MixinBedrockServerSelectionList",
     "core.integration.MixinBedrockFriendsInMultiplayer",
     "core.integration.MixinBedrockRealmsInRealms",
-    "core.integration.MixinBedrockRealmSelectionList"
+    "core.integration.MixinBedrockRealmSelectionList",
+    "core.integration.MixinBedrockMenuSmokeTest"
   ],
   "injectors": {
     "defaultRequire": 1

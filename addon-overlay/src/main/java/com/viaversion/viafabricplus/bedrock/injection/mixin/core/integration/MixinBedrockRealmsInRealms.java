@@ -43,7 +43,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(RealmsMainScreen.class)
-public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows {
+public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, BedrockMenuSmokeAccess {
+
+    @Shadow private RealmsMainScreen.RealmSelectionList realmSelectionList;
 
     @Shadow private Button playButton;
     @Shadow private Button configureButton;
@@ -69,6 +71,11 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows {
                     this.refreshListAndLayout();
                 }
             });
+    }
+
+    @Override
+    public boolean viaBedrock$hasMenuRows() {
+        return this.realmSelectionList.children().stream().anyMatch(BedrockRealmEntry.class::isInstance);
     }
 
     @Override
