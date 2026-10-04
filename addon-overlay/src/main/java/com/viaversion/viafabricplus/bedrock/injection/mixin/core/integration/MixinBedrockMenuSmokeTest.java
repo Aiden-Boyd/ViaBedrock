@@ -25,6 +25,7 @@ import com.mojang.realmsclient.RealmsMainScreen;
 import com.viaversion.viafabricplus.bedrock.ViaFabricPlusBedrock;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockMenuSmokeAccess;
 import net.minecraft.client.Minecraft;
+import com.viaversion.viafabricplus.bedrock.skin.JavaSkinService;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
@@ -59,6 +60,13 @@ public abstract class MixinBedrockMenuSmokeTest {
             if (!(client.gui.screen() instanceof TitleScreen) || ViaFabricPlusBedrock.impl().account() == null) {
                 return;
             }
+            if (!JavaSkinService.prepare().isDone()) {
+                return;
+            }
+            if (JavaSkinService.current() == null) {
+                throw new AssertionError("Java default skin did not load in the development client");
+            }
+            ViaFabricPlusBedrock.impl().logger().info("BEDROCK_JAVA_SKIN_SMOKE_PASSED");
             this.viaBedrock$smokeParent = client.gui.screen();
             this.viaBedrock$smokeScreen = new JoinMultiplayerScreen(this.viaBedrock$smokeParent);
             client.gui.setScreen(this.viaBedrock$smokeScreen);
