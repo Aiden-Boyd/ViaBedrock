@@ -40,7 +40,7 @@ public final class InventoryCodecSelfTest {
         try {
             final var decoded = InventoryTypes.ITEM_STACK_RESPONSES.read(responses);
             if (decoded.length != 2 || decoded[0].requestId() != -1 || !decoded[0].containers().isEmpty()
-                    || decoded[1].requestId() != -2 || decoded[1].containers().getFirst().slots().getFirst().itemNetId() != 42 || responses.isReadable()) {
+                    || decoded[1].requestId() != -2 || decoded[1].containers().get(0).slots().get(0).itemNetId() != 42 || responses.isReadable()) {
                 throw new AssertionError("Response entries lost alignment");
             }
         } finally {
