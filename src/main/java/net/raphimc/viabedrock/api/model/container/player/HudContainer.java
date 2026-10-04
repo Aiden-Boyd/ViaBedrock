@@ -23,16 +23,14 @@ import net.raphimc.viabedrock.api.model.container.block.CraftingTableContainer;
 import net.raphimc.viabedrock.api.model.container.block.StonecutterContainer;
 import net.raphimc.viabedrock.api.model.container.block.EnchantmentContainer;
 import net.raphimc.viabedrock.api.util.PacketFactory;
-import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.protocol.model.inventory.*;
 import net.raphimc.viabedrock.protocol.model.recipe.ShapedRecipe;
 import net.raphimc.viabedrock.protocol.model.recipe.ShapelessRecipe;
-import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.*;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
@@ -96,7 +94,7 @@ public class HudContainer extends InventoryRedirectContainer {
         if (consumption == null) {
             return false;
         }
-        final java.util.Map<Integer, Integer> consumed = new java.util.LinkedHashMap<>();
+        final Map<Integer, Integer> consumed = new LinkedHashMap<>();
         for (int slot = 0; slot < consumption.length; slot++) {
             if (consumption[slot] > 0) {
                 consumed.put(slot + 28, consumption[slot]);

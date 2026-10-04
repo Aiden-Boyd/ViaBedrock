@@ -31,6 +31,8 @@ import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
+import net.raphimc.viabedrock.api.model.container.player.HudContainer;
 import net.raphimc.viabedrock.api.model.container.block.EnchantmentContainer;
 import net.raphimc.viabedrock.api.model.BlockState;
 import net.raphimc.viabedrock.api.model.BlockConnections;
@@ -249,7 +251,7 @@ public final class InventoryCodecSelfTest {
             }
         };
         table.checkPlayerSlots();
-        final var player = new net.raphimc.viabedrock.api.model.container.player.InventoryContainer(user) {
+        final var player = new InventoryContainer(user) {
             public void checkCollection() {
                 final var sources = this.pickupAllSources();
                 if (sources.size() != 45) {
@@ -282,7 +284,7 @@ public final class InventoryCodecSelfTest {
         final ShapedRecipe recipe = new ShapedRecipe("table", new UUID(0, 0), "crafting_table", 0,
                 new ItemDescriptor[][]{{new ItemDescriptor.DefaultDescriptor(1, 0)}}, List.of(output), false);
         tracker[0].updateCraftingDataList(List.of(new CraftingDataStorage(RecipeType.SHAPED, 7, recipe)));
-        final var hud = new net.raphimc.viabedrock.api.model.container.player.HudContainer(user) {
+        final var hud = new HudContainer(user) {
             @Override
             protected boolean craftOutput(final int revision, final int recipeId, final BedrockItem result,
                                           final Map<Integer, Integer> consumed, final boolean quickMove) {
