@@ -24,16 +24,21 @@ import com.viaversion.viaversion.api.minecraft.item.StructuredItem;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
+import net.raphimc.viabedrock.protocol.model.FullContainerName;
 import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
+import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
 public class InventoryContainer extends Container {
@@ -50,6 +55,29 @@ public class InventoryContainer extends Container {
     }
 
     @Override
+    public boolean handleClick(final int revision, final short slot, final byte button, final ContainerInput action) {
+        final HudContainer hud = this.user.get(InventoryTracker.class).getHudContainer();
+        if (slot == 0) {
+            return action == ContainerInput.PICKUP && (button == 0 || button == 1) && hud.craft(revision);
+        }
+        final boolean handled = super.handleClick(revision, slot, button, action);
+        if (slot >= 1 && slot <= 4) {
+            hud.updateCraftingResult();
+            PacketFactory.sendJavaContainerSetContent(this.user, this);
+        }
+        return handled;
+    }
+
+    @Override
+    public FullContainerName getFullContainerName(final int slot) {
+        if (slot < 9) {
+            return new FullContainerName(ContainerEnumName.HotbarContainer, null);
+        }
+
+        return new FullContainerName(ContainerEnumName.InventoryContainer, null);
+    }
+
+    @Override
     public Item[] getJavaItems() {
         final InventoryTracker inventoryTracker = this.user.get(InventoryTracker.class);
         final Item[] inventoryItems = super.getJavaItems();
@@ -58,6 +86,7 @@ public class InventoryContainer extends Container {
         final Container hudContainer = inventoryTracker.getHudContainer();
 
         final Item[] combinedItems = StructuredItem.emptyArray(46);
+        combinedItems[0] = hudContainer.getJavaItem(50);
         System.arraycopy(armorItems, 0, combinedItems, 5, armorItems.length);
         System.arraycopy(inventoryItems, 9, combinedItems, 9, 27);
         System.arraycopy(inventoryItems, 0, combinedItems, 36, 9);
@@ -84,6 +113,15 @@ public class InventoryContainer extends Container {
             return 36 + slot;
         } else {
             return super.javaSlot(slot);
+        }
+    }
+
+    @Override
+    public int bedrockSlot(final int slot) {
+        if (slot >= 36 && slot < 45) {
+            return slot - 36;
+        } else {
+            return super.bedrockSlot(slot);
         }
     }
 

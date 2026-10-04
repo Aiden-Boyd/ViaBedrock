@@ -34,6 +34,7 @@ import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.protocol.StatelessTransitionProtocol;
 import net.raphimc.viabedrock.api.util.PacketFactory;
@@ -103,6 +104,7 @@ public class BedrockProtocol extends StatelessTransitionProtocol<ClientboundBedr
         UnhandledPackets.register(this);
 
         InteractionPackets.register(this);
+        InventoryRequestPackets.register(this);
 
         // Fallback for unhandled packets (Temporary)
         for (ClientboundBedrockPackets packet : this.unmappedClientboundPacketType.getEnumConstants()) {
@@ -148,6 +150,8 @@ public class BedrockProtocol extends StatelessTransitionProtocol<ClientboundBedr
         user.put(new PlayerListStorage());
         user.put(new ScoreboardTracker());
         user.put(new InventoryTracker(user));
+        user.put(new InventoryRequestTracker(user));
+        user.put(new CraftingDataTracker(user));
         user.put(new BreakingTracker(user));
 
         user.put(new InventoryTransactionRewriter(user));

@@ -145,3 +145,10 @@ registerToolTask("sortJson", "net.raphimc.viabedrock.tool.JsonSorter",
     "Sorts data asset json files in place. Options: --file (required), --deep")
 registerToolTask("convertResourcePack", "net.raphimc.viabedrock.test.ResourcePackConverterTest",
     "Converts a bedrock .mcpack to a java resource pack. Options: --input (required), --output")
+
+registerToolTask("selfTestInventoryCodecs", "net.raphimc.viabedrock.tool.inventory.InventoryCodecSelfTest",
+    "Checks fixed protocol 2193 inventory packet fixtures")
+
+tasks.named("check") {
+    dependsOn("selfTestInventoryCodecs")
+}

@@ -55,10 +55,12 @@ import net.lenni0451.mcstructs_bedrock.forms.types.ActionForm;
 import net.lenni0451.mcstructs_bedrock.forms.types.CustomForm;
 import net.lenni0451.mcstructs_bedrock.forms.types.ModalForm;
 import net.lenni0451.mcstructs_bedrock.text.utils.BedrockTextUtils;
+
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.chunk.BedrockBlockEntity;
 import net.raphimc.viabedrock.api.model.container.ChestContainer;
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.api.model.container.block.*;
 import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.api.util.PacketFactory;
@@ -67,6 +69,7 @@ import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.ServerboundBedrockPackets;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.*;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.EquipmentSlot;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
@@ -113,6 +116,10 @@ public final class InventoryPackets {
                 title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
             }
 
+            final boolean doubleChest = blockEntity != null && blockEntity.tag() != null
+                    && "Chest".equals(blockEntity.tag().getString("id"))
+                    && blockEntity.tag().contains("pairlead");
+
             final Container container;
             switch (type) {
                 case INVENTORY -> {
@@ -120,7 +127,25 @@ public final class InventoryPackets {
                     wrapper.cancel();
                     return;
                 }
-                case CONTAINER -> container = new ChestContainer(wrapper.user(), containerId, title, position, 27);
+                case CONTAINER -> container = new ChestContainer(wrapper.user(), containerId, title, position, doubleChest ? 54 : 27);
+                case HOPPER -> container = new HopperContainer(wrapper.user(), containerId, title, position);
+                case FURNACE -> container = new FurnaceContainer(wrapper.user(), containerId, title, position);
+                case BLAST_FURNACE -> container = new BlastFurnaceContainer(wrapper.user(), containerId, title, position);
+                case SMOKER -> container = new SmokerContainer(wrapper.user(), containerId, title, position);
+                case BREWING_STAND -> container = new BrewingStandContainer(wrapper.user(), containerId, title, position);
+                case BEACON -> container = new BeaconContainer(wrapper.user(), containerId, title, position);
+                case ENCHANTMENT -> container = new EnchantmentContainer(wrapper.user(), containerId, title, position);
+                case ANVIL -> container = new AnvilContainer(wrapper.user(), containerId, title, position);
+                case SMITHING_TABLE -> container = new SmithingContainer(wrapper.user(), containerId, title, position);
+                case STONECUTTER -> container = new StonecutterContainer(wrapper.user(), containerId, title, position);
+                case DISPENSER, DROPPER -> container = new Generic3x3Container(wrapper.user(), containerId, type, title, position);
+                case WORKBENCH -> container = new CraftingTableContainer(wrapper.user(), containerId, title, position);
+                case GRINDSTONE -> container = new GrindstoneContainer(wrapper.user(), containerId, title, position);
+                case CRAFTER -> container = new CrafterContainer(wrapper.user(), containerId, title, position);
+                case COMPOUND_CREATOR, ELEMENT_CONSTRUCTOR, MATERIAL_REDUCER, LAB_TABLE -> { // Education Edition features, no java equivalent
+                    wrapper.cancel();
+                    return;
+                }
                 case NONE, CAULDRON, JUKEBOX, ARMOR, HAND, HUD, DECORATED_POT -> { // Bedrock client can't open these containers
                     wrapper.cancel();
                     return;
@@ -136,7 +161,11 @@ public final class InventoryPackets {
             inventoryTracker.setCurrentContainer(container);
 
             wrapper.write(Types.VAR_INT, (int) containerId); // container id
-            wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getBedrockToJavaContainers().get(type)); // type
+            if (doubleChest) {
+                wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaMenuId("minecraft:generic_9x6"));
+            } else {
+                wrapper.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getBedrockToJavaContainers().get(type)); // type
+            }
             wrapper.write(Types.TAG, TextUtil.textComponentToNbt(title)); // title
         });
         protocol.registerClientbound(ClientboundBedrockPackets.CONTAINER_CLOSE, ClientboundPackets26_3.CONTAINER_CLOSE, new PacketHandlers() {
@@ -426,12 +455,19 @@ public final class InventoryPackets {
                 wrapper.cancel();
                 return;
             }
-            if (!container.handleClick(revision, slot, button, action)) {
-                if (container.type() != ContainerType.INVENTORY) {
-                    PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+            final UserConnection user = wrapper.user();
+            user.get(InventoryRequestTracker.class).runInventoryAction(() -> {
+                if (inventoryTracker.getPendingCloseContainer() != null
+                        || inventoryTracker.getContainerServerbound((byte) containerId) != container) {
+                    return;
                 }
-                PacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
-            }
+                if (!container.handleClick(revision, slot, button, action)) {
+                    if (container.type() != ContainerType.INVENTORY) {
+                        PacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+                    }
+                    PacketFactory.sendJavaContainerSetContent(user, container);
+                }
+            });
         });
         protocol.registerServerbound(ServerboundPackets26_3.SET_CREATIVE_MODE_SLOT, null, wrapper -> {
             wrapper.cancel();

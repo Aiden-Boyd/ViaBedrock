@@ -47,6 +47,14 @@ public final class ItemDataRewriter {
                 javaItem.dataContainer().set(StructuredDataKey.MAP_ID, user.get(MapTracker.class).getJavaId(uuidTag.asLong()));
             }
 
+            if (bedrockTag.get("display") instanceof CompoundTag displayTag) {
+                if (displayTag.get("Lore") instanceof ListTag<?> loreTag) {
+                    // TODO: Bedrock lore might be able to contain translatable components, but for now we just ignore that
+                    final Tag[] tags = loreTag.getValue().toArray(new Tag[0]);
+                    javaItem.dataContainer().set(StructuredDataKey.LORE, tags);
+                }
+            }
+
             if (bedrockTag.get("ench") instanceof ListTag<?> enchantments) {
 
                 final StructuredData<Enchantments> enchantmentsData = javaItem.dataContainer().getData(StructuredDataKey.ENCHANTMENTS1_21_5);

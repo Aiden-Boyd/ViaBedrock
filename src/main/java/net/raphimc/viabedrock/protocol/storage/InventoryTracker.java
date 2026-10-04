@@ -23,6 +23,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.libs.fastutil.ints.IntObjectPair;
 import net.lenni0451.mcstructs_bedrock.forms.Form;
+
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.model.container.dynamic.BundleContainer;
@@ -99,6 +100,33 @@ public class InventoryTracker extends StoredObject {
         return null;
     }
 
+    public Container getContainerFromName(final FullContainerName containerName, final int slot) {
+        if (containerName.name() == ContainerEnumName.InventoryContainer || containerName.name() == ContainerEnumName.HotbarContainer) {
+            return this.inventoryContainer;
+        }
+        if (containerName.name() == ContainerEnumName.OffhandContainer) {
+            return this.offhandContainer;
+        }
+        if (containerName.name() == ContainerEnumName.ArmorContainer) {
+            return this.armorContainer;
+        }
+        if (this.currentContainer != null) {
+            final int javaSlot = this.currentContainer.javaSlot(slot);
+            if (javaSlot >= 0 && javaSlot < this.currentContainer.size() && this.currentContainer.bedrockSlot(javaSlot) == slot
+                    && containerName.equals(this.currentContainer.getFullContainerName(slot))) {
+                return this.currentContainer;
+            }
+        }
+        if (containerName.name() == ContainerEnumName.CursorContainer || containerName.name() == ContainerEnumName.CraftingInputContainer
+                || containerName.name() == ContainerEnumName.CreatedOutputContainer || containerName.name() == ContainerEnumName.CraftingOutputPreviewContainer) {
+            return this.hudContainer;
+        }
+        if (containerName.name() == ContainerEnumName.DynamicContainer) {
+            return this.dynamicContainerRegistry.get(containerName);
+        }
+        return null;
+    }
+
     public BundleContainer getDynamicContainer(final FullContainerName containerName) {
         return this.dynamicContainerRegistry.get(containerName);
     }
@@ -121,6 +149,7 @@ public class InventoryTracker extends StoredObject {
         if (serverInitiated) {
             PacketFactory.sendBedrockContainerClose(this.user(), this.currentContainer.containerId(), ContainerType.NONE);
         }
+        this.hudContainer.setItem(0, BedrockItem.empty());
         this.currentContainer = null;
         this.pendingCloseContainer = null;
     }

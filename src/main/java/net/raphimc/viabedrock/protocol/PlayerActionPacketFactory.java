@@ -21,12 +21,15 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.protocols.v1_21_9to1_21_11.packet.ClientboundPackets1_21_11;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+
 import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerActionType;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
+import net.raphimc.viabedrock.protocol.types.InventoryTypes;
 
 public final class PlayerActionPacketFactory {
 
@@ -40,6 +43,12 @@ public final class PlayerActionPacketFactory {
         startItemUseOn.sendToServer(BedrockProtocol.class);
     }
 
+    public static void sendBedrockInventoryRequest(final UserConnection user, final ItemStackRequestInfo[] info) {
+        final PacketWrapper inventoryRequest = PacketWrapper.create(ServerboundBedrockPackets.ITEM_STACK_REQUEST, user);
+        inventoryRequest.write(InventoryTypes.ITEM_STACK_REQUESTS, info);
+        inventoryRequest.sendToServer(BedrockProtocol.class);
+    }
+
     public static void sendBedrockDismount(final UserConnection user, final long entityRuntimeId) {
         final PacketWrapper dismountPacket = PacketWrapper.create(ServerboundBedrockPackets.INTERACT, user);
         dismountPacket.write(Types.UNSIGNED_BYTE, (short) InteractPacketPayload_Action.StopRiding.getValue()); // action
@@ -50,7 +59,7 @@ public final class PlayerActionPacketFactory {
 
     public static void sendJavaSetPassengers(final UserConnection user, final Entity vehicle) {
         final EntityTracker entityTracker = user.get(EntityTracker.class);
-        final PacketWrapper setPassengersPacket = PacketWrapper.create(ClientboundPackets1_21_11.SET_PASSENGERS, user);
+        final PacketWrapper setPassengersPacket = PacketWrapper.create(ClientboundPackets26_3.SET_PASSENGERS, user);
         setPassengersPacket.write(Types.VAR_INT, vehicle.javaId()); // vehicle
         setPassengersPacket.write(Types.VAR_INT, vehicle.passengers().size()); // number of passengers
         for (long passengerUid : vehicle.passengers()) {

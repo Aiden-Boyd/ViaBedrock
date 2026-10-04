@@ -51,6 +51,9 @@ This file has been dumped from a BDS server using [CloudburstMC/ProxyPass](https
 
 [Kaooot/bedrock-network-data](https://github.com/Kaooot/bedrock-network-data/blob/6abdab1f549ffafdd627f4d4de34709a0e981345/release/1.26.40/item_tags.json)
 
+### data/bedrock/items.json
+[AllayMC/BedrockData](https://github.com/AllayMC/BedrockData/blob/986a7f06bfa6d012d6c39b0c0d0acef25a9535ce/1.26.12.2/items.json)
+
 ### data/bedrock/level_sound_event_mappings.json
 
 This file has been generated using `./gradlew generateBedrockSoundLists` from the official bedrock client's assets folder.
