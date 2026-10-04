@@ -73,7 +73,8 @@ public abstract class MixinBedrockMenuSmokeTest {
             // Exercise saved-account restoration and JWT providers without signing in or making requests.
             final var httpClient = net.raphimc.minecraftauth.MinecraftAuth.createHttpClient();
             final var auth = net.raphimc.minecraftauth.bedrock.BedrockAuthManager.create(
-                httpClient, net.raphimc.viabedrock.protocol.data.ProtocolConstants.BEDROCK_VERSION_NAME);
+                httpClient, net.raphimc.viabedrock.protocol.data.ProtocolConstants.BEDROCK_VERSION_NAME)
+                .login(new net.raphimc.minecraftauth.msa.model.MsaToken(Long.MAX_VALUE, "offline-fixture", null));
             final var restored = net.raphimc.minecraftauth.bedrock.BedrockAuthManager.fromJson(
                 httpClient, net.raphimc.viabedrock.protocol.data.ProtocolConstants.BEDROCK_VERSION_NAME,
                 net.raphimc.minecraftauth.bedrock.BedrockAuthManager.toJson(auth));
