@@ -77,6 +77,21 @@ public final class AccountWorldList<T> {
         }, client);
     }
 
+    public void remember(final Object account, final T world, final java.util.function.Predicate<T> matches) {
+        if (this.account != account) {
+            this.account = account;
+            this.worlds = List.of();
+        }
+        this.generation++;
+        this.loading = false;
+        this.error = null;
+        this.nextRefresh = Long.MIN_VALUE;
+        final var updated = new java.util.ArrayList<>(this.worlds);
+        updated.removeIf(matches);
+        updated.add(world);
+        this.worlds = List.copyOf(updated);
+    }
+
     public List<T> worlds() {
         return this.worlds;
     }

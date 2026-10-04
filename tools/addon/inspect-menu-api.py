@@ -20,6 +20,12 @@ for jar in root.rglob("*.jar"):
                     "net/minecraft/client/multiplayer/ServerData.class",
                     "net/minecraft/client/multiplayer/ServerList.class",
                     "net/minecraft/client/Minecraft.class",
+                    "net/minecraft/client/renderer/texture/DynamicTexture.class",
+                    "com/mojang/blaze3d/platform/NativeImage.class",
+                    "net/minecraft/client/renderer/texture/TextureManager.class",
+                    "net/minecraft/client/gui/GuiGraphicsExtractor.class",
+                    "net/minecraft/client/gui/components/PlayerFaceExtractor.class",
+                    "com/mojang/realmsclient/gui/screens/RealmsJoinRealmWithCodeScreen.class",
                     "net/minecraft/client/input/KeyEvent.class",
                     "net/minecraft/client/input/MouseButtonEvent.class",
                 ])]

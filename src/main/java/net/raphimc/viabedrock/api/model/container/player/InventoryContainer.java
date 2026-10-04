@@ -57,11 +57,13 @@ public class InventoryContainer extends Container {
     @Override
     public boolean handleClick(final int revision, final short slot, final byte button, final ContainerInput action) {
         final HudContainer hud = this.user.get(InventoryTracker.class).getHudContainer();
-        if (slot == 0) {
-            return action == ContainerInput.PICKUP && (button == 0 || button == 1) && hud.craft(revision);
+        if (slot == 0 && action != ContainerInput.PICKUP_ALL && action != ContainerInput.QUICK_CRAFT) {
+            return (action == ContainerInput.PICKUP || action == ContainerInput.QUICK_MOVE)
+                    && (button == 0 || button == 1) && hud.craft(revision, action == ContainerInput.QUICK_MOVE);
         }
         final boolean handled = super.handleClick(revision, slot, button, action);
-        if (slot >= 1 && slot <= 4) {
+        if ((slot >= 1 && slot <= 4 || action == ContainerInput.PICKUP_ALL)
+                && (action != ContainerInput.QUICK_CRAFT || (button & 3) == 2)) {
             hud.updateCraftingResult();
             PacketFactory.sendJavaContainerSetContent(this.user, this);
         }

@@ -57,7 +57,8 @@
     "core.integration.MixinBedrockRealmsInRealms",
     "core.integration.MixinBedrockRealmSelectionList",
     "core.integration.MixinBedrockMenuSmokeTest",
-    "features.misc.MixinJavaSkinPreload"
+    "features.misc.MixinJavaSkinPreload",
+    "core.integration.MixinBedrockRealmInvite"
   ],
   "injectors": {
     "defaultRequire": 1

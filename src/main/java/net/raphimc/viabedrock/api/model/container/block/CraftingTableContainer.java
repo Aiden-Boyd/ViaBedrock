@@ -118,7 +118,7 @@ public class CraftingTableContainer extends Container {
 
     @Override
     public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        if (javaSlot != 0 || action == ContainerInput.QUICK_CRAFT) {
+        if (javaSlot != 0 || action == ContainerInput.QUICK_CRAFT || action == ContainerInput.PICKUP_ALL) {
             final boolean handled = super.handleClick(revision, javaSlot, button, action);
             this.updateCraftingResult();
             if (action != ContainerInput.QUICK_CRAFT || (button & 3) == 2) {

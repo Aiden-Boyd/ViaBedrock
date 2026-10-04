@@ -91,6 +91,13 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, Be
     }
 
     @Override
+    public void viaBedrock$acceptedRealm(final World world) {
+        this.viaBedrock$worlds.remember(world.account(), world,
+            existing -> existing.realm().getId() == world.realm().getId());
+        this.refreshListAndLayout();
+    }
+
+    @Override
     public List<BedrockRealmData> viaBedrock$realms() {
         final BedrockAuthManager account = ViaFabricPlusBedrock.impl().account().get();
         final List<BedrockRealmData> rows = new ArrayList<>();

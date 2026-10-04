@@ -565,20 +565,13 @@ public abstract class Container {
         }
         final int maximum = this.user.get(ItemRewriter.class).maxStackSize(cursorItem);
         int amount = cursorItem.amount();
-        final List<SlotRef> sources = new ArrayList<>();
-        final Container inventory = this instanceof InventoryContainer ? this : context.inventoryTracker.getInventoryContainer();
-        context.prevContainers.add(inventory.copy());
-        if (!(this instanceof InventoryContainer)) {
-            for (int slot = 0; slot < this.size(); slot++) {
-                final int bedrockSlot = this.bedrockSlot(slot);
-                final ContainerEnumName name = this.getFullContainerName(bedrockSlot).name();
-                if (name != ContainerEnumName.CraftingOutputPreviewContainer && name != ContainerEnumName.CreatedOutputContainer) {
-                    sources.add(new SlotRef(this, bedrockSlot));
-                }
+        final List<SlotRef> sources = this.pickupAllSources();
+        final Set<Container> snapshotted = new LinkedHashSet<>();
+        snapshotted.add(this);
+        for (SlotRef source : sources) {
+            if (snapshotted.add(source.container())) {
+                context.prevContainers.add(source.container().copy());
             }
-        }
-        for (int slot = 9; slot < 45; slot++) {
-            sources.add(new SlotRef(inventory, inventory.bedrockSlot(slot)));
         }
         final List<ItemStackRequestAction> actions = new ArrayList<>();
         for (int pass = 0; pass < 2 && amount < maximum; pass++) {
@@ -600,6 +593,34 @@ public abstract class Container {
             cursor.setItem(0, this.copyStackWithAmount(cursorItem, amount));
         }
         return actions;
+    }
+
+    protected List<SlotRef> pickupAllSources() {
+        final List<SlotRef> sources = new ArrayList<>();
+        final InventoryTracker tracker = this.user.get(InventoryTracker.class);
+        if (this instanceof InventoryContainer) {
+            // The Java player window includes the 2x2 inputs, armor and offhand.
+            // Its result preview is not a real stack that may be collected.
+            for (short slot = 1; slot < 46; slot++) {
+                final SlotRef source = this.resolveJavaSlot(slot);
+                if (source != null) {
+                    sources.add(source);
+                }
+            }
+        } else {
+            for (int slot = 0; slot < this.size(); slot++) {
+                final int bedrockSlot = this.bedrockSlot(slot);
+                final ContainerEnumName name = this.getFullContainerName(bedrockSlot).name();
+                if (name != ContainerEnumName.CraftingOutputPreviewContainer && name != ContainerEnumName.CreatedOutputContainer) {
+                    sources.add(new SlotRef(this, bedrockSlot));
+                }
+            }
+            final Container inventory = tracker.getInventoryContainer();
+            for (int slot = 9; slot < 45; slot++) {
+                sources.add(new SlotRef(inventory, inventory.bedrockSlot(slot)));
+            }
+        }
+        return sources;
     }
 
     private ItemStackRequestAction handleThrowClick(final ClickContext clickContext, final short javaSlot, final byte button) {

@@ -19,11 +19,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 package com.viaversion.viafabricplus.bedrock.integration;
 
-import java.util.List;
+import java.net.URI;
 
-public interface BedrockRealmRows {
-    void viaBedrock$acceptedRealm(BedrockRealmDiscovery.World world);
-    List<BedrockRealmData> viaBedrock$realms();
+public final class RealmInviteCode {
+    private RealmInviteCode() {}
+
+    public static String normalize(final String input) {
+        String code = input.trim();
+        if (code.startsWith("https://") || code.startsWith("http://")) {
+            final URI uri = URI.create(code);
+            if (!"realms.gg".equalsIgnoreCase(uri.getHost()) || uri.getUserInfo() != null || uri.getPort() != -1) {
+                throw new IllegalArgumentException("Use a Realm code or a realms.gg invite link");
+            }
+            code = uri.getPath().replaceFirst("^/", "");
+        } else if (code.startsWith("realms.gg/")) {
+            code = code.substring(10);
+        }
+        if (!code.matches("[A-Za-z0-9_-]{1,64}")) {
+            throw new IllegalArgumentException("Invalid Realm invite code");
+        }
+        return code;
+    }
 }

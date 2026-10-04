@@ -46,6 +46,20 @@ class AccountWorldListTest {
     }
 
     @Test
+    void acceptedInviteSurvivesAnOlderDiscoveryResponse() {
+        final AccountWorldList<String> list = new AccountWorldList<>();
+        final Object account = new Object();
+        final CompletableFuture<List<String>> stale = new CompletableFuture<>();
+        list.refresh(account, 1, 30, () -> stale, Runnable::run, () -> {});
+        list.remember(account, "accepted realm", "accepted realm"::equals);
+        stale.complete(List.of());
+        assertEquals(List.of("accepted realm"), list.worlds());
+        assertFalse(list.loading());
+        list.remember(account, "accepted realm", "accepted realm"::equals);
+        assertEquals(1, list.worlds().size());
+    }
+
+    @Test
     void logoutInvalidatesPendingDiscovery() {
         final AccountWorldList<String> list = new AccountWorldList<>();
         final CompletableFuture<List<String>> pending = new CompletableFuture<>();

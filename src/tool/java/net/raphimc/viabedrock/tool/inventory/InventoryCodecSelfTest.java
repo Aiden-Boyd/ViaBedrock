@@ -249,6 +249,24 @@ public final class InventoryCodecSelfTest {
             }
         };
         table.checkPlayerSlots();
+        final var player = new net.raphimc.viabedrock.api.model.container.player.InventoryContainer(user) {
+            public void checkCollection() {
+                final var sources = this.pickupAllSources();
+                if (sources.size() != 45) {
+                    throw new AssertionError("Player collection omitted visible inventory slots");
+                }
+                for (int index = 0; index < 4; index++) {
+                    if (sources.get(index).container() != inventory.getHudContainer()
+                            || sources.get(index).bedrockSlot() != index + 28) {
+                        throw new AssertionError("Double-click collection omitted the 2x2 grid");
+                    }
+                }
+                if (sources.stream().anyMatch(source -> source.container() == inventory.getHudContainer() && source.bedrockSlot() == 50)) {
+                    throw new AssertionError("Double-click collected a virtual recipe preview");
+                }
+            }
+        };
+        player.checkCollection();
         if (!table.setItems(BedrockItem.emptyArray(10)) || !table.setItems(BedrockItem.emptyArray(54))) {
             throw new AssertionError("Crafting table compact/UI updates failed");
         }
@@ -264,6 +282,20 @@ public final class InventoryCodecSelfTest {
         final ShapedRecipe recipe = new ShapedRecipe("table", new UUID(0, 0), "crafting_table", 0,
                 new ItemDescriptor[][]{{new ItemDescriptor.DefaultDescriptor(1, 0)}}, List.of(output), false);
         tracker[0].updateCraftingDataList(List.of(new CraftingDataStorage(RecipeType.SHAPED, 7, recipe)));
+        final var hud = new net.raphimc.viabedrock.api.model.container.player.HudContainer(user) {
+            @Override
+            protected boolean craftOutput(final int revision, final int recipeId, final BedrockItem result,
+                                          final Map<Integer, Integer> consumed, final boolean quickMove) {
+                if (revision != 19 || recipeId != 7 || result.amount() != 4 || !consumed.equals(Map.of(31, 1))) {
+                    throw new AssertionError("2x2 crafting did not use the shared output transaction");
+                }
+                return quickMove;
+            }
+        };
+        hud.setItem(31, input.copy());
+        if (hud.craft(19, false) || !hud.craft(19, true) || hud.getItem(31).amount() != 3) {
+            throw new AssertionError("2x2 shift-click mode or recipe planning failed");
+        }
         table.setItem(40, input);
         if (table.getItem(50).amount() != 4 || output.amount() != 4) {
             throw new AssertionError("Crafting table preview did not update");

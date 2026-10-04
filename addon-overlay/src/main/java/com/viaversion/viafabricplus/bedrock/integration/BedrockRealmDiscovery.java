@@ -36,9 +36,13 @@ public final class BedrockRealmDiscovery {
 
     public record World(BedrockAuthManager account, RealmsServer realm, BedrockRealmsService service) {}
 
-    public static CompletableFuture<List<World>> worlds(final BedrockAuthManager account) {
-        final BedrockRealmsService service = new BedrockRealmsService(MinecraftAuth.createHttpClient(),
+    public static BedrockRealmsService service(final BedrockAuthManager account) {
+        return new BedrockRealmsService(MinecraftAuth.createHttpClient(),
             ProtocolConstants.BEDROCK_VERSION_NAME, account.getRealmsXstsToken());
+    }
+
+    public static CompletableFuture<List<World>> worlds(final BedrockAuthManager account) {
+        final BedrockRealmsService service = service(account);
         return service.isCompatibleAsync().thenCompose(compatible -> {
             if (!compatible) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Bedrock Realms is unavailable for this client version"));

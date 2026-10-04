@@ -19,11 +19,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 package com.viaversion.viafabricplus.bedrock.integration;
 
-import java.util.List;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
-public interface BedrockRealmRows {
-    void viaBedrock$acceptedRealm(BedrockRealmDiscovery.World world);
-    List<BedrockRealmData> viaBedrock$realms();
+class RealmInviteCodeTest {
+    @Test
+    void acceptsCodesAndOfficialInviteLinks() {
+        assertEquals("Abc_-123", RealmInviteCode.normalize("  Abc_-123  "));
+        assertEquals("Abc_-123", RealmInviteCode.normalize("https://realms.gg/Abc_-123?source=share"));
+        assertEquals("Abc_-123", RealmInviteCode.normalize("realms.gg/Abc_-123"));
+    }
+
+    @Test
+    void rejectsForeignLinksAndExtraPaths() {
+        assertThrows(IllegalArgumentException.class, () -> RealmInviteCode.normalize("https://example.com/code"));
+        assertThrows(IllegalArgumentException.class, () -> RealmInviteCode.normalize("https://realms.gg/a/b"));
+        assertThrows(IllegalArgumentException.class, () -> RealmInviteCode.normalize(""));
+    }
 }
