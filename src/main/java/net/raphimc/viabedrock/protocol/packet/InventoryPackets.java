@@ -455,12 +455,19 @@ public final class InventoryPackets {
                 wrapper.cancel();
                 return;
             }
-            if (!container.handleClick(revision, slot, button, action)) {
-                if (container.type() != ContainerType.INVENTORY) {
-                    PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+            final UserConnection user = wrapper.user();
+            user.get(InventoryRequestTracker.class).runInventoryAction(() -> {
+                if (inventoryTracker.getPendingCloseContainer() != null
+                        || inventoryTracker.getContainerServerbound((byte) containerId) != container) {
+                    return;
                 }
-                PacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
-            }
+                if (!container.handleClick(revision, slot, button, action)) {
+                    if (container.type() != ContainerType.INVENTORY) {
+                        PacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+                    }
+                    PacketFactory.sendJavaContainerSetContent(user, container);
+                }
+            });
         });
         protocol.registerServerbound(ServerboundPackets26_3.SET_CREATIVE_MODE_SLOT, null, wrapper -> {
             wrapper.cancel();

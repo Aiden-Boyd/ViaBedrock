@@ -18,6 +18,7 @@
 package net.raphimc.viabedrock.protocol.packet;
 
 import com.viaversion.viaversion.api.type.Types;
+import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 
@@ -40,6 +41,8 @@ import net.raphimc.viabedrock.protocol.types.recipe.CraftingRecipesType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.LinkedHashSet;
 
 public final class InventoryRequestPackets {
 
@@ -59,12 +62,19 @@ public final class InventoryRequestPackets {
                 wrapper.cancel();
                 return;
             }
-            if (!container.handleButtonClick(button)) {
-                if (container.type() != ContainerType.INVENTORY) {
-                    PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+            final UserConnection user = wrapper.user();
+            user.get(InventoryRequestTracker.class).runInventoryAction(() -> {
+                if (inventoryTracker.getPendingCloseContainer() != null
+                        || inventoryTracker.getContainerServerbound((byte) containerId) != container) {
+                    return;
                 }
-                PacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
-            }
+                if (!container.handleButtonClick(button)) {
+                    if (container.type() != ContainerType.INVENTORY) {
+                        PacketFactory.sendJavaContainerSetContent(user, inventoryTracker.getInventoryContainer());
+                    }
+                    PacketFactory.sendJavaContainerSetContent(user, container);
+                }
+            });
         });
         protocol.registerServerbound(ServerboundPackets26_3.SET_BEACON, null, wrapper -> {
             wrapper.cancel();
@@ -137,7 +147,8 @@ public final class InventoryRequestPackets {
             final InventoryRequestTracker inventoryRequestTracker = wrapper.user().get(InventoryRequestTracker.class);
             final ItemStackResponseInfo[] infoList = wrapper.read(InventoryTypes.ITEM_STACK_RESPONSES);
 
-            // Resync the inventory content based on the response
+            final Set<Container> changedContainers = new LinkedHashSet<>();
+            // Apply authoritative stack IDs before running the next queued click.
             for (ItemStackResponseInfo info : infoList) {
 
                 final InventoryRequestStorage requestInfo = inventoryRequestTracker.getRequest(info.requestId());
@@ -154,52 +165,64 @@ public final class InventoryRequestPackets {
                                     + ", javaRevision=" + requestInfo.javaRevision()
                                     + ", actions=" + requestInfo.requestInfo().actions()
                     );
-                    inventoryTracker.getHudContainer().setItems(requestInfo.prevCursorContainer().getItems().clone());
+                    inventoryRequestTracker.clearInventoryActions();
+                    inventoryTracker.getHudContainer().setItem(0, requestInfo.prevCursorContainer().getItem(0).copy());
+                    changedContainers.add(inventoryTracker.getInventoryContainer());
                     for (Container container : requestInfo.prevContainers()) {
                         final Container newContainer = inventoryTracker.getContainerClientbound(container.containerId(), null, null);
                         if (newContainer == null) {
                             continue;
                         }
                         newContainer.setItems(container.getItems().clone());
-                        PacketFactory.sendJavaContainerSetContent(wrapper.user(), newContainer);  // Resync the container content on Java side
+                        changedContainers.add(newContainer);
                     }
                     continue;
                 }
 
-                //TODO: This is required for crafting so that the cursor item net id is updated properly
-                //TODO: Check that the items match the request, if not resync the container (We probably should do this anyway to be safe)
-                final List<Container> mismatchedContainers = new ArrayList<>();
                 for (ItemStackResponseContainerInfo containerInfo : info.containers()) {
                     for (ItemStackResponseSlotInfo slotInfo : containerInfo.slots()) {
-                        final Container container = inventoryTracker.getContainerFromName(containerInfo.containerName(), slotInfo.slot());
+                        final int slot = Byte.toUnsignedInt(slotInfo.slot());
+                        final Container container = inventoryTracker.getContainerFromName(containerInfo.containerName(), slot);
                         if (container == null) {
                             ViaBedrock.getPlatform().getLogger().warning("Received item stack response for unknown container: " + containerInfo.containerName());
                             continue;
                         }
-
-                        // Check if the item matches the expected item
-                        final BedrockItem expectedItem = container.getItem(slotInfo.slot());
-                        if (expectedItem.isEmpty()) {
-                            continue; //TODO
+                        final BedrockItem expectedItem = container.getItem(slot);
+                        final int amount = Byte.toUnsignedInt(slotInfo.amount());
+                        if (amount == 0) {
+                            if (!expectedItem.isEmpty()) {
+                                container.setItem(slot, BedrockItem.empty());
+                                changedContainers.add(container);
+                            }
+                            continue;
                         }
-                        if (expectedItem.netId() == null || expectedItem.netId() != slotInfo.itemNetId() || expectedItem.amount() != slotInfo.amount()) {
-                            final BedrockItem newItem = expectedItem.copy();
-                            newItem.setNetId(slotInfo.itemNetId());
-                            newItem.setAmount(slotInfo.amount());
-                            container.setItem(slotInfo.slot(), newItem);
-                            if (container.getFullContainerName(slotInfo.slot()).name() != ContainerEnumName.CursorContainer) {
-                                mismatchedContainers.add(container);
+                        if (expectedItem.isEmpty()) {
+                            continue;
+                        }
+                        if (expectedItem.amount() != amount) {
+                            final BedrockItem updated = expectedItem.copy();
+                            if (slotInfo.itemNetId() > 0) {
+                                updated.setNetId(slotInfo.itemNetId());
+                            }
+                            updated.setAmount(amount);
+                            container.setItem(slot, updated);
+                            changedContainers.add(container);
+                        } else {
+                            // Stack network IDs are invisible to Java. Updating only the ID must not rewind its prediction.
+                            if (slotInfo.itemNetId() > 0) {
+                                expectedItem.setNetId(slotInfo.itemNetId());
                             }
                         }
-                        // TODO:  Handle custom name and durability
                     }
                 }
-
-                for (Container container : mismatchedContainers) {
-                    PacketFactory.sendJavaContainerSetContent(wrapper.user(), container);  // Resync the container content on Java side
+            }
+            inventoryRequestTracker.flushInventoryActions();
+            for (Container container : changedContainers) {
+                if (container == inventoryTracker.getHudContainer()) {
+                    PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
+                } else {
+                    PacketFactory.sendJavaContainerSetContent(wrapper.user(), container);
                 }
-                // Force resync cursor
-                PacketFactory.sendJavaContainerSetContent(wrapper.user(), inventoryTracker.getInventoryContainer());
             }
         });
         protocol.registerClientbound(ClientboundBedrockPackets.CONTAINER_SET_DATA, ClientboundPackets26_3.CONTAINER_SET_DATA, wrapper -> {

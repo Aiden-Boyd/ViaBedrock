@@ -22,6 +22,15 @@ import net.raphimc.viabedrock.protocol.types.InventoryTypes;
 import net.raphimc.viabedrock.protocol.types.inventory.ItemStackSlotResponseType;
 
 import java.util.HexFormat;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
+import net.raphimc.viabedrock.protocol.storage.InventoryRequestTracker;
+import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
+import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
+import net.raphimc.viabedrock.api.model.container.Container;
 import java.util.List;
 import java.util.UUID;
 import java.util.Arrays;
@@ -70,26 +79,84 @@ public final class InventoryCodecSelfTest {
         }
         checkCrafting();
         checkVirtualContainers();
+        checkInventorySequencing();
         System.out.println("Inventory protocol 2193 and crafting fixtures passed");
+    }
+
+    private static void checkInventorySequencing() {
+        final UserConnection user = (UserConnection) Proxy.newProxyInstance(UserConnection.class.getClassLoader(),
+                new Class<?>[]{UserConnection.class}, (proxy, method, arguments) -> {
+                    throw new UnsupportedOperationException(method.getName());
+                });
+        final InventoryRequestTracker requests = new InventoryRequestTracker(user);
+        final List<Integer> executed = new ArrayList<>();
+        final ItemStackRequestInfo first = new ItemStackRequestInfo(-3, List.of(), List.of(), TextProcessingEventOrigin.unknown);
+        final ItemStackRequestInfo second = new ItemStackRequestInfo(-5, List.of(), List.of(), TextProcessingEventOrigin.unknown);
+        requests.addRequest(new InventoryRequestStorage(first, 0, null, List.of()));
+        requests.runInventoryAction(() -> {
+            executed.add(1);
+            requests.addRequest(new InventoryRequestStorage(second, 0, null, List.of()));
+        });
+        requests.runInventoryAction(() -> executed.add(2));
+        requests.flushInventoryActions();
+        if (!executed.isEmpty()) {
+            throw new AssertionError("Click ran before stack IDs were confirmed");
+        }
+        requests.removeRequest(-3);
+        requests.flushInventoryActions();
+        if (!executed.equals(List.of(1))) {
+            throw new AssertionError("Queued clicks overlapped the next request");
+        }
+        requests.removeRequest(-5);
+        requests.flushInventoryActions();
+        if (!executed.equals(List.of(1, 2))) {
+            throw new AssertionError("Queued click order changed");
+        }
+        requests.addRequest(new InventoryRequestStorage(first, 0, null, List.of()));
+        requests.runInventoryAction(() -> executed.add(3));
+        requests.clearInventoryActions();
+        requests.removeRequest(-3);
+        requests.flushInventoryActions();
+        if (!executed.equals(List.of(1, 2))) {
+            throw new AssertionError("Rejected request retained dependent clicks");
+        }
     }
 
     private static void checkVirtualContainers() {
         final CraftingDataTracker[] tracker = new CraftingDataTracker[1];
+        final Map<Class<?>, Object> storages = new HashMap<>();
         final UserConnection user = (UserConnection) Proxy.newProxyInstance(UserConnection.class.getClassLoader(),
                 new Class<?>[]{UserConnection.class}, (proxy, method, arguments) -> {
-                    if (method.getName().equals("get") && arguments[0] == CraftingDataTracker.class) {
-                        return tracker[0];
+                    if (method.getName().equals("get")) {
+                        return storages.get(arguments[0]);
                     }
                     throw new UnsupportedOperationException(method.getName());
                 });
         tracker[0] = new CraftingDataTracker(user);
+        storages.put(CraftingDataTracker.class, tracker[0]);
+        final InventoryTracker inventory = new InventoryTracker(user);
+        storages.put(InventoryTracker.class, inventory);
         final StonecutterContainer stonecutter = new StonecutterContainer(user, (byte) 1, null, null);
         if (!stonecutter.setItems(BedrockItem.emptyArray(2)) || !stonecutter.setItems(BedrockItem.emptyArray(54))
                 || stonecutter.bedrockSlot(0) != 3 || stonecutter.bedrockSlot(1) != 50
                 || stonecutter.handleButtonClick(-1) || stonecutter.handleButtonClick(0)) {
             throw new AssertionError("Stonecutter compact/UI updates or recipe bounds failed");
         }
-        final CraftingTableContainer table = new CraftingTableContainer(user, (byte) 2, null, null);
+        final var table = new CraftingTableContainer(user, (byte) 2, null, null) {
+            public void checkPlayerSlots() {
+                for (short slot = 10; slot < 46; slot++) {
+                    final SlotRef mapped = this.resolveJavaSlot(slot);
+                    final int expected = inventory.getInventoryContainer().bedrockSlot(slot - 10 + 9);
+                    if (mapped == null || mapped.container() != inventory.getInventoryContainer() || mapped.bedrockSlot() != expected) {
+                        throw new AssertionError("Open crafting table redirected a player slot to equipment: " + slot);
+                    }
+                }
+                if (this.resolveJavaSlot((short) 1).bedrockSlot() != 32 || this.resolveJavaSlot((short) 46) != null) {
+                    throw new AssertionError("Virtual input or invalid slot mapping failed");
+                }
+            }
+        };
+        table.checkPlayerSlots();
         if (!table.setItems(BedrockItem.emptyArray(10)) || !table.setItems(BedrockItem.emptyArray(54))) {
             throw new AssertionError("Crafting table compact/UI updates failed");
         }
@@ -108,6 +175,11 @@ public final class InventoryCodecSelfTest {
         table.setItem(40, input);
         if (table.getItem(50).amount() != 4 || output.amount() != 4) {
             throw new AssertionError("Crafting table preview did not update");
+        }
+        final Container snapshot = table.copy();
+        table.getItem(40).setAmount(2);
+        if (snapshot.getItems()[9].amount() != 3) {
+            throw new AssertionError("Rollback snapshot shared mutable stacks");
         }
         table.setItem(40, BedrockItem.empty());
         if (!table.getItem(50).isEmpty()) {

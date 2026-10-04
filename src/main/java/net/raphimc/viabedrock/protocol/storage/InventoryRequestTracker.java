@@ -21,13 +21,35 @@ import com.viaversion.viaversion.api.connection.StoredObject;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.libs.fastutil.ints.Int2ObjectOpenHashMap;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class InventoryRequestTracker extends StoredObject {
 
     Int2ObjectOpenHashMap<InventoryRequestStorage> requests = new Int2ObjectOpenHashMap<>();
     int requestIdCounter = -1;
+    private final Deque<Runnable> pendingClicks = new ArrayDeque<>();
 
     public InventoryRequestTracker(final UserConnection user) {
         super(user);
+    }
+
+    public void runInventoryAction(final Runnable action) {
+        if (!this.requests.isEmpty()) {
+            this.pendingClicks.addLast(action);
+        } else {
+            action.run();
+        }
+    }
+
+    public void flushInventoryActions() {
+        while (this.requests.isEmpty() && !this.pendingClicks.isEmpty()) {
+            this.pendingClicks.removeFirst().run();
+        }
+    }
+
+    public void clearInventoryActions() {
+        this.pendingClicks.clear();
     }
 
     public int nextRequestId() {
