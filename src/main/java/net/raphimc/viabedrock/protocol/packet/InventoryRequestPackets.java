@@ -140,6 +140,9 @@ public final class InventoryRequestPackets {
             }
             wrapper.clearPacket();
             craftingDataTracker.sendJavaUpdateRecipes(wrapper.user());
+            final var hud = wrapper.user().get(InventoryTracker.class).getHudContainer();
+            hud.updateCraftingResult();
+            hud.sendCraftingResult();
         });
         protocol.registerClientbound(ClientboundBedrockPackets.ITEM_STACK_RESPONSE, null, wrapper -> {
             wrapper.cancel();

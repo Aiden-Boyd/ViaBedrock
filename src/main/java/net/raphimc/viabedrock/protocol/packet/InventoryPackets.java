@@ -112,7 +112,7 @@ public final class InventoryPackets {
                 return;
             }
             final BedrockBlockEntity blockEntity = chunkTracker.getBlockEntity(position);
-            TextComponent title = new TranslationComponent("container." + blockStateRewriter.tag(chunkTracker.getBlockState(position)));
+            TextComponent title = new TranslationComponent(containerTitleKey(type, blockStateRewriter.tag(chunkTracker.getBlockState(position)), false));
             if (blockEntity != null && blockEntity.tag().get("CustomName") instanceof StringTag customNameTag) {
                 title = TextUtil.stringToTextComponent(wrapper.user().get(ResourcePackStorage.class).getTexts().translate(customNameTag.getValue()));
             }
@@ -121,6 +121,9 @@ public final class InventoryPackets {
                     && "Chest".equals(blockEntity.tag().getString("id"))
                     && BlockConnections.chestPartner(position, blockEntity.tag()) != null;
 
+            if (doubleChest && (blockEntity == null || !(blockEntity.tag().get("CustomName") instanceof StringTag))) {
+                title = new TranslationComponent("container.chestDouble");
+            }
             final Container container;
             switch (type) {
                 case INVENTORY -> {
@@ -237,6 +240,9 @@ public final class InventoryPackets {
                     wrapper.write(Types.SHORT, (short) container.javaSlot(slot)); // slot
                 }
                 wrapper.write(VersionedTypes.V26_3.item, container.getJavaItem(slot)); // item
+                if (container == inventoryTracker.getHudContainer() && (slot >= 28 && slot <= 31 || slot == 50)) {
+                    inventoryTracker.getHudContainer().sendCraftingResult();
+                }
             } else {
                 wrapper.cancel();
             }
@@ -594,6 +600,29 @@ public final class InventoryPackets {
             wrapper.write(Types.UNSIGNED_BYTE, (short) 9); // number of empty hotbar slots (vanilla client always sends 9)
             wrapper.write(Types.BOOLEAN, includeData); // include data
         });
+    }
+
+
+    public static String containerTitleKey(final ContainerType type, final String blockTag, final boolean doubleChest) {
+        return switch (type) {
+            case WORKBENCH -> "container.crafting";
+            case CONTAINER -> doubleChest ? "container.chestDouble" : "container.chest";
+            case ENCHANTMENT -> "container.enchant";
+            case ANVIL -> "container.repair";
+            case STONECUTTER -> "container.stonecutter";
+            case SMITHING_TABLE -> "container.upgrade";
+            case GRINDSTONE -> "container.grindstone_title";
+            case BREWING_STAND -> "container.brewing";
+            case FURNACE -> "container.furnace";
+            case BLAST_FURNACE -> "container.blast_furnace";
+            case SMOKER -> "container.smoker";
+            case HOPPER -> "container.hopper";
+            case DISPENSER -> "container.dispenser";
+            case DROPPER -> "container.dropper";
+            case BEACON -> "container.beacon";
+            case CRAFTER -> "container.crafter";
+            default -> "container." + blockTag;
+        };
     }
 
     private static void addTextToDialog(final UserConnection userConnection, final Dialog dialog, final String text) {

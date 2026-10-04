@@ -31,6 +31,11 @@ import net.raphimc.viabedrock.protocol.storage.*;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
+import com.viaversion.viaversion.api.type.Types;
+import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
+import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
+import net.raphimc.viabedrock.protocol.BedrockProtocol;
 
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerID;
@@ -66,7 +71,7 @@ public class HudContainer extends InventoryRedirectContainer {
             open.setItem(slot, newItem);
             PacketFactory.sendJavaContainerSetContent(this.user, open);
         }
-        if (slot >= 28 && slot <= 31) {
+        if (slot >= 28 && slot <= 31 && (open == null || open instanceof InventoryContainer)) {
             this.updateCraftingResult();
         }
     }
@@ -77,6 +82,33 @@ public class HudContainer extends InventoryRedirectContainer {
                 : recipe.recipe() instanceof ShapedRecipe shaped ? shaped.getResults()
                 : recipe.recipe() instanceof ShapelessRecipe shapeless ? shapeless.getResults() : List.of();
         super.setItem(50, results.size() == 1 ? results.get(0).copy() : BedrockItem.empty());
+    }
+
+    public void sendCraftingResult() {
+        final Container open = this.user.get(InventoryTracker.class).getCurrentContainer();
+        if (open != null && !(open instanceof InventoryContainer)) {
+            return;
+        }
+        final PacketWrapper packet = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, this.user);
+        packet.write(Types.VAR_INT, 0);
+        packet.write(Types.VAR_INT, 0);
+        packet.write(Types.SHORT, (short) 0);
+        packet.write(VersionedTypes.V26_3.item, this.getJavaItem(50));
+        packet.send(BedrockProtocol.class);
+    }
+
+    @Override
+    public boolean setItems(final BedrockItem[] items) {
+        if (!super.setItems(items)) {
+            return false;
+        }
+        // Bedrock's output slot is transient. Calculate the Java preview after the
+        // entire update, including the empty output slot, has been applied.
+        final Container open = this.user.get(InventoryTracker.class).getCurrentContainer();
+        if (open == null || open instanceof InventoryContainer) {
+            this.updateCraftingResult();
+        }
+        return true;
     }
 
     public boolean craft(final int revision) {
@@ -106,6 +138,10 @@ public class HudContainer extends InventoryRedirectContainer {
     @Override
     public boolean setItem(final int bedrockSlot, final BedrockItem item) {
         if (super.setItem(bedrockSlot, item)) {
+            final Container open = this.user.get(InventoryTracker.class).getCurrentContainer();
+            if (bedrockSlot == 50 && (open == null || open instanceof InventoryContainer)) {
+                this.updateCraftingResult();
+            }
             return bedrockSlot == 0 || (bedrockSlot >= 28 && bedrockSlot <= 31) || bedrockSlot == 50;
         } else {
             return false;

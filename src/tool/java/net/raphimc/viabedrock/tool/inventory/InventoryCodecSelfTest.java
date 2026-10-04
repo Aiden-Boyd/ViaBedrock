@@ -31,6 +31,8 @@ import net.raphimc.viabedrock.protocol.storage.InventoryRequestStorage;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.protocol.packet.InventoryPackets;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
 import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.api.model.container.player.HudContainer;
 import net.raphimc.viabedrock.api.model.container.block.EnchantmentContainer;
@@ -297,6 +299,24 @@ public final class InventoryCodecSelfTest {
         hud.setItem(31, input.copy());
         if (hud.craft(19, false) || !hud.craft(19, true) || hud.getItem(31).amount() != 3) {
             throw new AssertionError("2x2 shift-click mode or recipe planning failed");
+        }
+        final BedrockItem[] hudUpdate = BedrockItem.emptyArray(54);
+        hudUpdate[31] = input.copy();
+        hud.setItems(hudUpdate);
+        if (hud.getItem(50).amount() != 4) {
+            throw new AssertionError("A full HUD update erased the 2x2 result preview");
+        }
+        hud.setItem(50, BedrockItem.empty());
+        if (hud.getItem(50).amount() != 4) {
+            throw new AssertionError("A transient empty Bedrock output erased the 2x2 result");
+        }
+        hud.setItem(31, BedrockItem.empty());
+        if (!hud.getItem(50).isEmpty()) {
+            throw new AssertionError("2x2 result survived removing its ingredients");
+        }
+        if (!InventoryPackets.containerTitleKey(
+                ContainerType.WORKBENCH, "craftingbench", false).equals("container.crafting")) {
+            throw new AssertionError("Crafting table leaked its Bedrock block tag into the Java title");
         }
         table.setItem(40, input);
         if (table.getItem(50).amount() != 4 || output.amount() != 4) {

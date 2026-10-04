@@ -38,7 +38,6 @@ import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
 import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
-import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
 public class InventoryContainer extends Container {
@@ -65,7 +64,7 @@ public class InventoryContainer extends Container {
         if ((slot >= 1 && slot <= 4 || action == ContainerInput.PICKUP_ALL)
                 && (action != ContainerInput.QUICK_CRAFT || (button & 3) == 2)) {
             hud.updateCraftingResult();
-            PacketFactory.sendJavaContainerSetContent(this.user, this);
+            hud.sendCraftingResult();
         }
         return handled;
     }

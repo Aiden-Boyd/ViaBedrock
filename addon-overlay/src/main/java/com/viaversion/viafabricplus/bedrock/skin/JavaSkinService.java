@@ -43,6 +43,7 @@ public final class JavaSkinService {
     private static UUID profileId;
     private static CompletableFuture<JavaSkinData> pending;
     private static volatile JavaSkinData fallback;
+    private static volatile net.minecraft.world.entity.player.PlayerSkin visibleSkin;
 
     private JavaSkinService() {}
 
@@ -54,6 +55,7 @@ public final class JavaSkinService {
         }
         profileId = id;
         fallback = null;
+        visibleSkin = DefaultPlayerSkin.get(id);
         pending = CompletableFuture.supplyAsync(() -> load(client, id));
         return pending;
     }
@@ -72,6 +74,11 @@ public final class JavaSkinService {
         return future.getNow(fallback);
     }
 
+    public static net.minecraft.world.entity.player.PlayerSkin visibleSkin() {
+        prepare();
+        return visibleSkin;
+    }
+
     private static JavaSkinData load(final Minecraft client, final UUID id) {
         JavaSkinData defaultSkin = null;
         try {
@@ -84,12 +91,20 @@ public final class JavaSkinService {
                     fallback = defaultSkin;
                 }
             }
-            final var profile = client.getGameProfile();
+            var profile = client.getGameProfile();
             if (!id.equals(profile.id())) {
                 return defaultSkin;
             }
             final var session = client.services().sessionService();
-            final var property = session.getPackedTextures(profile);
+            var property = session.getPackedTextures(profile);
+            if (property == null) {
+                final var fetched = session.fetchProfile(id, true);
+                if (fetched == null || !id.equals(fetched.profile().id())) {
+                    return defaultSkin;
+                }
+                profile = fetched.profile();
+                property = session.getPackedTextures(profile);
+            }
             if (property == null) {
                 return defaultSkin;
             }
@@ -97,6 +112,19 @@ public final class JavaSkinService {
             if (textures.signatureState() == SignatureState.INVALID || textures.skin() == null) {
                 return defaultSkin;
             }
+            final var resolvedProfile = profile;
+            client.execute(() -> {
+                synchronized (JavaSkinService.class) {
+                    if (!id.equals(profileId)) return;
+                }
+                client.getSkinManager().get(resolvedProfile).thenAcceptAsync(loaded -> {
+                    synchronized (JavaSkinService.class) {
+                        if (id.equals(profileId)) {
+                            loaded.ifPresent(skin -> visibleSkin = skin);
+                        }
+                    }
+                }, client);
+            });
             final var texture = textures.skin();
             final URI original = URI.create(texture.getUrl());
             if (!"textures.minecraft.net".equalsIgnoreCase(original.getHost()) ||
