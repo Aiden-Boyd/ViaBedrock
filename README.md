@@ -19,7 +19,11 @@ file).
 
 ### Fabric mod (Clientside)
 
-To use ViaBedrock as a Fabric mod, install [ViaFabricPlus](https://github.com/ViaVersion/ViaFabricPlus) and its separate [Bedrock protocol addon](https://github.com/ViaVersionAddons/ViaFabricPlus-Bedrock). For this fork, use the custom addon produced by the [Build ViaFabricPlus Bedrock Addon workflow](https://github.com/Aiden-Boyd/ViaBedrock/actions).
+For this fork, install Fabric Loader for Minecraft **26.3** with Java **25**, then put the `viabedrock-standalone-*.jar` from the [Build Standalone Bedrock Fabric Mod workflow](https://github.com/Aiden-Boyd/ViaBedrock/actions/workflows/build-vfp-bedrock-test-addon.yml) into your mods folder. No separate ViaVersion, ViaFabricPlus, or Bedrock addon jar is required. Replace the previous custom Bedrock addon when updating.
+
+The jar bundles ViaFabricPlus and its translation engines internally, together with this fork's ViaBedrock code and client integration. The source still uses the ViaVersion API. Native friends and Realms listings use the Xbox account configured in the bundled Bedrock settings.
+
+CI checks the embedded translation classes and launches the packaged mod in an empty game directory with external engine libraries and development mod outputs removed. Authenticated server/Realm gameplay still needs live QA.
 
 ## Features
 

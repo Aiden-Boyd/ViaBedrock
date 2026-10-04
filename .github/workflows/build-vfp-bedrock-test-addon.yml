@@ -1,4 +1,4 @@
-name: Build ViaFabricPlus Bedrock Test Addon
+name: Build Standalone Bedrock Fabric Mod
 
 on:
   workflow_dispatch:
@@ -93,6 +93,11 @@ jobs:
         timeout-minutes: 5
         run: python3 ../ViaBedrock/tools/addon/smoke-menu-client.py
 
+      - name: Launch packaged mod without external ViaVersion or ViaFabricPlus
+        working-directory: ../viafabricplus-bedrock
+        timeout-minutes: 6
+        run: python3 ../ViaBedrock/tools/addon/smoke-standalone-client.py
+
       - name: Inspect Minecraft menu APIs
         working-directory: ../viafabricplus-bedrock
         run: |
@@ -127,12 +132,12 @@ jobs:
           mkdir -p artifact
           SHORT_SHA="$(git rev-parse --short HEAD)"
           cp ../viafabricplus-bedrock/build/libs/viafabricplus-bedrock-1.1.1-SNAPSHOT.jar \
-            "artifact/viafabricplus-bedrock-custom-$SHORT_SHA.jar"
+            "artifact/viabedrock-standalone-$SHORT_SHA.jar"
 
-      - name: Upload verified test addon
+      - name: Upload verified standalone mod
         uses: actions/upload-artifact@v4
         with:
-          name: viafabricplus-bedrock-custom
+          name: viabedrock-standalone
           path: artifact/*.jar
           if-no-files-found: error
           retention-days: 14

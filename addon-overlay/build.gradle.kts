@@ -7,6 +7,8 @@ plugins {
 
 dependencies {
     implementation(libs.viafabricplus)
+    // Keep its existing nested engines intact; users install only our outer jar.
+    include(libs.viafabricplus) { isTransitive = false }
 
     jarInJar(libs.viabedrock) {
         exclude(group = "com.mojang", module = "brigadier")
@@ -40,5 +42,21 @@ tasks.test {
 if (System.getenv("VIA_BEDROCK_MENU_SMOKE") == "true") {
     tasks.named<JavaExec>("runClient") {
         systemProperty("viaBedrock.menuSmoke", "true")
+    }
+}
+
+if (System.getenv("VIA_BEDROCK_STANDALONE_SMOKE") == "true") {
+    tasks.named<JavaExec>("runClient") {
+        doFirst {
+            val launch = groovy.json.JsonOutput.toJson(mapOf(
+                "java" to javaLauncher.get().executablePath.asFile.absolutePath,
+                "classpath" to classpath.files.map { it.absolutePath },
+                "jvmArgs" to allJvmArgs,
+                "args" to (args ?: emptyList<String>())
+            ))
+            layout.buildDirectory.file("standalone-launch.json").get().asFile.writeText(launch)
+            // The smoke script launches Knot directly against the packaged mod.
+            throw GradleException("STANDALONE_LAUNCH_EXPORTED")
+        }
     }
 }
