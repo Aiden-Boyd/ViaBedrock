@@ -101,14 +101,12 @@ public final class PlayerActionPacketFactory {
     }
 
     public static void writeAuthInputBlockActions(final PacketWrapper wrapper, final List<ClientPlayerEntity.AuthInputBlockAction> actions) {
-        wrapper.write(BedrockTypes.VAR_INT, actions.size()); // signed action count
+        // Protocol 2193 uses an unsigned vector length and a complete struct for every action.
+        wrapper.write(BedrockTypes.UNSIGNED_VAR_INT, actions.size());
         for (ClientPlayerEntity.AuthInputBlockAction action : actions) {
-            wrapper.write(BedrockTypes.VAR_INT, action.action().getValue());
             switch (action.action()) {
-                case StopDestroyBlock -> {
-                    // Stop has no position or face payload.
-                }
-                case StartDestroyBlock, AbortDestroyBlock, CrackBlock, PredictDestroyBlock, ContinueDestroyBlock -> {
+                case StartDestroyBlock, AbortDestroyBlock, StopDestroyBlock, CrackBlock, PredictDestroyBlock, ContinueDestroyBlock -> {
+                    wrapper.write(BedrockTypes.VAR_INT, action.action().getValue());
                     wrapper.write(BedrockTypes.BLOCK_POSITION, Objects.requireNonNull(action.position(), "block action position"));
                     wrapper.write(BedrockTypes.VAR_INT, action.direction());
                 }

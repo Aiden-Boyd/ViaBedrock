@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 root = Path("src/main/java/com/viaversion/viafabricplus/bedrock")
-removed = ['injection/mixin/core/integration/MixinLimitationsImpl.java', 'injection/mixin/core/integration/MixinProtocolCategory.java', 'injection/mixin/core/integration/MixinProtocolVersionMetadata.java', 'injection/mixin/core/integration/MixinSettingsScreen.java', 'injection/mixin/core/integration/MixinVFPScreen.java', 'settings/ActionSetting.java', 'screen/settings/ActionListEntry.java', 'screen/BedrockRealmsScreen.java', 'screen/AcceptInvitationCodeScreen.java']
+removed = ['injection/mixin/core/integration/MixinLimitationsImpl.java', 'injection/mixin/core/integration/MixinProtocolCategory.java', 'injection/mixin/core/integration/MixinProtocolVersionMetadata.java', 'injection/mixin/core/integration/MixinSettingsScreen.java', 'injection/mixin/core/integration/MixinVFPScreen.java', 'settings/ActionSetting.java', 'screen/settings/ActionListEntry.java', 'screen/BedrockRealmsScreen.java', 'screen/AcceptInvitationCodeScreen.java', 'screen/BedrockFriendsScreen.java', 'screen/BedrockFriendProfileScreen.java', 'friends/BedrockSocialService.java']
 for name in removed:
     (root / name).unlink(missing_ok=True)
 # All remaining sources are overlay-owned. Refuse accidental framework dependencies.

@@ -32,6 +32,8 @@ required = {
 assert required <= owned_classes, f"Missing bundled translation classes: {required - owned_classes}"
 assert "viafabricplus-bedrock" in mod_ids
 assert not {"viafabricplus", "viafabricplus-api"} & mod_ids
+for removed_screen in ("BedrockFriendsScreen", "BedrockFriendProfileScreen"):
+    assert not any(name.endswith("/" + removed_screen + ".class") for name in owned_classes), removed_screen
 for name in owned_classes:
     assert not name.startswith(("com/viaversion/viafabricplus/screen/", "com/viaversion/viafabricplus/api/", "com/viaversion/viabackwards/", "net/raphimc/vialegacy/", "com/viaversion/viaaprilfools/")), name
 print("Bundled modules:", ", ".join(sorted(mod_ids)), flush=True)

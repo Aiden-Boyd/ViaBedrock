@@ -577,7 +577,7 @@ public class ClientPlayerEntity extends PlayerEntity {
     public record AuthInputBlockAction(PlayerActionType action, BlockPosition position, int direction) {
 
         public AuthInputBlockAction(final PlayerActionType action) {
-            this(action, null, -1);
+            this(action, new BlockPosition(0, 0, 0), 0);
         }
 
     }

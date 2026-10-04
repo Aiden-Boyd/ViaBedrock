@@ -29,12 +29,13 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 final class PlayerAuthInputBlockActionsTest {
 
     @Test
-    void mixedStopAndStartMatchesBedrockWireFormat() throws Exception {
+    void mixedStopAndStartMatchesProtocol2193WireFormat() throws Exception {
         final PacketWrapper wrapper = new PacketWrapperImpl(ServerboundBedrockPackets.PLAYER_AUTH_INPUT, null, null);
         PlayerActionPacketFactory.writeAuthInputBlockActions(wrapper, List.of(
             new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock),
@@ -46,11 +47,63 @@ final class PlayerAuthInputBlockActionsTest {
             Types.VAR_INT.read(buffer); // packet id
             final byte[] payload = new byte[buffer.readableBytes()];
             buffer.readBytes(payload);
-            // Signed count=2, stop=2 without payload, start=0, x=1, signed y=2, z=3, face=5.
-            assertArrayEquals(new byte[]{4, 4, 0, 2, 4, 6, 10}, payload);
+            // v2193: unsigned count=2; stop=2 with default position/face; start=0 at (1,2,3), face=5.
+            assertArrayEquals(new byte[]{2, 4, 0, 0, 0, 0, 0, 2, 4, 6, 10}, payload);
         } finally {
             buffer.release();
         }
+    }
+
+    @Test
+    void allMiningActionsLeaveTheFollowingAuthInputFieldsAligned() throws Exception {
+        final var actions = List.of(
+            new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StartDestroyBlock, new BlockPosition(-1, 64, 127), 5),
+            new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.CrackBlock, new BlockPosition(-1, 64, 127), 5),
+            new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.ContinueDestroyBlock, new BlockPosition(-1, 64, 127), 5),
+            new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.PredictDestroyBlock, new BlockPosition(-1, 64, 127), 5),
+            new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.AbortDestroyBlock, new BlockPosition(-1, 64, 127), 5),
+            new ClientPlayerEntity.AuthInputBlockAction(PlayerActionType.StopDestroyBlock)
+        );
+        final PacketWrapper wrapper = new PacketWrapperImpl(ServerboundBedrockPackets.PLAYER_AUTH_INPUT, null, null);
+        PlayerActionPacketFactory.writeAuthInputBlockActions(wrapper, actions);
+        wrapper.write(Types.BOOLEAN, false); // vehicle rotation absent
+        wrapper.write(Types.BOOLEAN, false); // vehicle ID absent
+        wrapper.write(net.raphimc.viabedrock.protocol.types.BedrockTypes.FLOAT_LE, 0.25F); // next movement field
+        final var buffer = Unpooled.buffer();
+        try {
+            wrapper.writeToBuffer(buffer);
+            Types.VAR_INT.read(buffer);
+            // Read fields individually like the v2193 decoder, independently of our writer.
+            assertEquals(6, readUnsignedVarInt(buffer));
+            for (var action : actions) {
+                assertEquals(action.action().getValue(), readSignedVarInt(buffer));
+                assertEquals(action.position().x(), readSignedVarInt(buffer));
+                assertEquals(action.position().y(), readSignedVarInt(buffer));
+                assertEquals(action.position().z(), readSignedVarInt(buffer));
+                assertEquals(action.direction(), readSignedVarInt(buffer));
+            }
+            assertEquals(false, buffer.readBoolean());
+            assertEquals(false, buffer.readBoolean());
+            assertEquals(0.25F, buffer.readFloatLE());
+            assertEquals(0, buffer.readableBytes());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    private static int readUnsignedVarInt(final io.netty.buffer.ByteBuf buffer) {
+        int value = 0;
+        for (int shift = 0; shift < 35; shift += 7) {
+            final int next = buffer.readUnsignedByte();
+            value |= (next & 0x7F) << shift;
+            if ((next & 0x80) == 0) return value;
+        }
+        throw new AssertionError("Invalid varint");
+    }
+
+    private static int readSignedVarInt(final io.netty.buffer.ByteBuf buffer) {
+        final int value = readUnsignedVarInt(buffer);
+        return (value >>> 1) ^ -(value & 1);
     }
 
     @Test

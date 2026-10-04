@@ -37,12 +37,10 @@ public final class BedrockSettingsScreen extends Screen {
         final var account = ViaFabricPlusBedrock.impl().account();
         this.addRenderableWidget(Button.builder(Component.literal(account.get() == null ? "Sign in to Microsoft" : "Switch Microsoft account"), button -> account.login())
             .bounds(this.width / 2 - 100, 70, 200, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Xbox friends"), button -> new BedrockFriendsScreen().open(this))
-            .bounds(this.width / 2 - 100, 100, 200, 20).build());
         this.addRenderableWidget(Button.builder(this.portLabel(), button -> {
             final var settings = ViaFabricPlusBedrock.impl().settings();
             settings.defaultBedrockPort(!settings.defaultBedrockPort()); button.setMessage(this.portLabel());
-        }).bounds(this.width / 2 - 100, 130, 200, 20).build());
+        }).bounds(this.width / 2 - 100, 100, 200, 20).build());
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.onClose())
             .bounds(this.width / 2 - 100, this.height - 30, 200, 20).build());
     }
