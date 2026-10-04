@@ -72,12 +72,12 @@ public final class PlayerInputLocks {
     public static boolean mountTarget(final String type) {
         return type != null && (type.endsWith("_boat") || type.endsWith("_raft")
                 || type.equals("minecraft:boat") || type.equals("minecraft:chest_boat")
-                || type.contains("minecart") || switch (type) {
-                    case "minecraft:horse", "minecraft:donkey", "minecraft:mule", "minecraft:skeleton_horse",
-                            "minecraft:zombie_horse", "minecraft:camel", "minecraft:camel_husk",
-                            "minecraft:pig", "minecraft:strider", "minecraft:happy_ghast" -> true;
-                    default -> false;
-                });
+                || type.equals("minecraft:minecart") || switch (type) {
+            case "minecraft:horse", "minecraft:donkey", "minecraft:mule", "minecraft:skeleton_horse",
+                    "minecraft:zombie_horse", "minecraft:camel", "minecraft:camel_husk",
+                    "minecraft:pig", "minecraft:strider", "minecraft:happy_ghast" -> true;
+            default -> false;
+        });
     }
 
 }

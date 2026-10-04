@@ -58,4 +58,5 @@ class PlayerInputLocksTest {
         assertTrue(PlayerInputLocks.mountTarget("minecraft:camel"));
         assertFalse(PlayerInputLocks.mountTarget("minecraft:villager"));
     }
+
 }

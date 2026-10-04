@@ -62,6 +62,7 @@ public class ClientPlayerEntity extends PlayerEntity {
     private int pendingTeleportId;
     private boolean waitingForPositionSync;
     private boolean serverSideTeleportConfirmed;
+    private long lastMovementCorrectionTick = -1;
 
     // Server Authoritative Movement
     private Position3f prevPosition;
@@ -228,6 +229,25 @@ public class ClientPlayerEntity extends PlayerEntity {
             this.serverSideTeleportConfirmed = true;
             this.authInputData.add(PlayerAuthInputData.HandledTeleport);
         }
+    }
+
+    public boolean acceptMovementCorrection(final long tick) {
+        // Zero is explicitly valid and has no prediction-history association.
+        if (tick == 0) {
+            return true;
+        }
+        if (tick < 0 || tick > this.age || tick <= this.lastMovementCorrectionTick) {
+            return false;
+        }
+        this.lastMovementCorrectionTick = tick;
+        return true;
+    }
+
+    public void writeMovementCorrection(final PacketWrapper wrapper, final Position3f velocity) {
+        this.writePlayerPositionPacketToClient(wrapper, Relative.ROTATION, true);
+        wrapper.set(Types.DOUBLE, 3, (double) velocity.x());
+        wrapper.set(Types.DOUBLE, 4, (double) velocity.y());
+        wrapper.set(Types.DOUBLE, 5, (double) velocity.z());
     }
 
     public Position3f prevPosition() {

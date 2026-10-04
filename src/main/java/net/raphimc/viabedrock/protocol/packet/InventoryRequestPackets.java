@@ -17,6 +17,7 @@
  */
 package net.raphimc.viabedrock.protocol.packet;
 
+import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
@@ -340,13 +341,13 @@ public final class InventoryRequestPackets {
         if (response.itemNetId() > 0) {
             updated.setNetId(response.itemNetId());
         }
-        final com.viaversion.nbt.tag.CompoundTag tag = updated.tag() != null ? updated.tag() : new com.viaversion.nbt.tag.CompoundTag();
+        final CompoundTag tag = updated.tag() != null ? updated.tag() : new CompoundTag();
         final String name = response.filteredCustomName() != null ? response.filteredCustomName() : response.customName();
         if (!name.isEmpty()) {
-            final com.viaversion.nbt.tag.CompoundTag display = tag.get("display") instanceof com.viaversion.nbt.tag.CompoundTag existingDisplay ? existingDisplay : new com.viaversion.nbt.tag.CompoundTag();
+            final CompoundTag display = tag.get("display") instanceof CompoundTag existingDisplay ? existingDisplay : new CompoundTag();
             display.putString("Name", name);
             tag.put("display", display);
-        } else if (tag.get("display") instanceof com.viaversion.nbt.tag.CompoundTag display) {
+        } else if (tag.get("display") instanceof CompoundTag display) {
             display.remove("Name");
         }
         // Non-durable items must not acquire damage components from a default zero correction.

@@ -24,6 +24,7 @@ import com.viaversion.viaversion.protocol.packet.PacketWrapperImpl;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerAuthInputData;
 import net.raphimc.viabedrock.protocol.data.enums.java.Relative;
+import net.raphimc.viabedrock.protocol.data.enums.java.generated.InputFlag;
 import net.raphimc.viabedrock.protocol.model.PlayerAbilities;
 import net.raphimc.viabedrock.protocol.model.Position3f;
 import org.junit.jupiter.api.BeforeAll;
@@ -95,6 +96,49 @@ class MovementSyncTest {
         assertEquals(0, resyncs[0]);
         player.updatePlayerPosition(4D, 64D, 2D, (short) 0);
         assertEquals(1, resyncs[0]);
+    }
+
+    @Test
+    void correctionKeepsServerVelocityAndDoesNotPreserveOldJavaVelocity() {
+        final ClientPlayerEntity player = player();
+        final PacketWrapper packet = new PacketWrapperImpl(ClientboundPackets26_3.PLAYER_POSITION, null, null);
+        player.writeMovementCorrection(packet, new Position3f(0.25F, 0.5F, -0.75F));
+        assertEquals(0.25D, packet.get(Types.DOUBLE, 3));
+        assertEquals(0.5D, packet.get(Types.DOUBLE, 4));
+        assertEquals(-0.75D, packet.get(Types.DOUBLE, 5));
+        assertEquals(Relative.ROTATION.stream().mapToInt(relative -> 1 << relative.ordinal()).sum(), packet.get(Types.INT, 0));
+    }
+
+    @Test
+    void zeroAndOutOfHistoryCorrectionsAreValidButDuplicatesAndOlderTicksAreNot() {
+        final ClientPlayerEntity player = player();
+        for (int tick = 0; tick < 100; tick++) {
+            player.tick();
+        }
+        assertTrue(player.acceptMovementCorrection(0));
+        assertTrue(player.acceptMovementCorrection(1));
+        assertTrue(player.acceptMovementCorrection(90));
+        assertFalse(player.acceptMovementCorrection(90));
+        assertFalse(player.acceptMovementCorrection(89));
+        assertFalse(player.acceptMovementCorrection(101));
+        assertTrue(player.acceptMovementCorrection(0));
+        assertTrue(player.acceptMovementCorrection(100));
+    }
+
+    @Test
+    void movementLockRevokesHeldInputAndPendingSprintStart() {
+        final ClientPlayerEntity player = player();
+        player.setInputFlags(Set.of(InputFlag.FORWARD, InputFlag.JUMP, InputFlag.SPRINT));
+        player.setSprinting(true);
+        player.addAuthInputData(PlayerAuthInputData.StartSprinting);
+        player.setInputLocks(1 << 2);
+        assertTrue(player.inputFlags().isEmpty());
+        assertFalse(player.isSprinting());
+        assertFalse(player.authInputData().contains(PlayerAuthInputData.StartSprinting));
+        assertTrue(player.authInputData().contains(PlayerAuthInputData.StopSprinting));
+        player.setInputLocks(0);
+        player.setInputFlags(Set.of(InputFlag.FORWARD));
+        assertTrue(player.inputFlags().contains(InputFlag.FORWARD));
     }
 
     private static int teleport(final ClientPlayerEntity player, final boolean fake) {

@@ -174,8 +174,6 @@ public final class ClientPlayerPackets {
             }
         });
         protocol.registerClientbound(ClientboundBedrockPackets.CORRECT_PLAYER_MOVE_PREDICTION, ClientboundPackets26_3.PLAYER_POSITION, wrapper -> {
-            final GameSessionStorage gameSession = wrapper.user().get(GameSessionStorage.class);
-
             final byte rawRewindType = wrapper.read(Types.BYTE); // rewind type
             final RewindType rewindType = RewindType.getByValue(rawRewindType);
             if (rewindType == null) {
@@ -193,7 +191,10 @@ public final class ClientPlayerPackets {
             final ClientPlayerEntity clientPlayer = entityTracker.getClientPlayer();
             final boolean onGround = wrapper.read(Types.BOOLEAN); // on ground
             final long tick = wrapper.read(BedrockTypes.UNSIGNED_VAR_LONG); // tick
-            if (tick > clientPlayer.age() || tick < clientPlayer.age() - gameSession.getMovementRewindHistorySize()) {
+            if (!position.isFinite() || !velocity.isFinite()
+                    || (rewindType == RewindType.Vehicle && (!Float.isFinite(vehicleRotation.x()) || !Float.isFinite(vehicleRotation.y())))
+                    || (rewindType == RewindType.Vehicle && entityTracker.controlledBoat() == null)
+                    || !clientPlayer.acceptMovementCorrection(tick)) {
                 wrapper.cancel();
                 return;
             }
@@ -201,7 +202,7 @@ public final class ClientPlayerPackets {
                 case Player -> {
                     clientPlayer.setPosition(position);
                     clientPlayer.setOnGround(onGround);
-                    clientPlayer.writePlayerPositionPacketToClient(wrapper, Relative.union(Relative.ROTATION, Relative.VELOCITY), true);
+                    clientPlayer.writeMovementCorrection(wrapper, velocity);
                 }
                 case Vehicle -> {
                     final BoatEntity boat = entityTracker.controlledBoat();
@@ -324,7 +325,11 @@ public final class ClientPlayerPackets {
                     clientPlayer.setGliding(true);
                     clientPlayer.addAuthInputData(PlayerAuthInputData.StartGliding);
                 }
-                default -> throw new IllegalStateException("Unhandled PlayerCommandAction: " + action);
+                case STOP_SLEEPING -> clientPlayer.sendPlayerActionPacketToServer(PlayerActionType.StopSleeping);
+                // Horse jumping and horse inventory translation require a dedicated mount implementation.
+                // Do not disconnect the player for an ordinary Java client action in the meantime.
+                case START_RIDING_JUMP, STOP_RIDING_JUMP, OPEN_INVENTORY -> {
+                }
             }
         });
         protocol.registerServerbound(ServerboundPackets26_3.PLAYER_ACTION, null, wrapper -> {
@@ -475,7 +480,9 @@ public final class ClientPlayerPackets {
             final InteractionHand hand = InteractionHand.values()[wrapper.read(Types.VAR_INT)]; // hand
             if (hand != InteractionHand.MAIN_HAND || entityTracker.getClientPlayer().abilities().playerPermission() == PlayerPermissionLevel.Visitor.getValue()
                     || (entityTracker.getClientPlayer().inputLocks().locked(net.raphimc.viabedrock.protocol.model.PlayerInputLocks.MOUNT)
-                    && net.raphimc.viabedrock.protocol.model.PlayerInputLocks.mountTarget(entity.type()))) {
+                    && !entityTracker.getClientPlayer().isSneaking()
+                    && net.raphimc.viabedrock.protocol.model.PlayerInputLocks.mountTarget(entity.type())
+                    && (inventoryContainer.getSelectedHotbarItem().isEmpty() || entity instanceof BoatEntity))) {
                 wrapper.cancel();
                 return;
             }

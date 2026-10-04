@@ -85,4 +85,5 @@ class StackResponseMetadataTest {
         item.setTag(tag);
         return item;
     }
+
 }
