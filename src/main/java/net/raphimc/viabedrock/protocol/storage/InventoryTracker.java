@@ -228,6 +228,14 @@ public class InventoryTracker extends StoredObject {
         this.currentContainer = container;
     }
 
+    public void replaceCurrentContainer(final Container container) {
+        if (this.currentContainer == null || this.currentContainer.containerId() != container.containerId() || this.pendingCloseContainer != null) {
+            throw new IllegalStateException("Cannot replace a different or closing container");
+        }
+        this.user().get(InventoryRequestTracker.class).clearInventoryActions();
+        this.currentContainer = container;
+    }
+
     public Container getPendingCloseContainer() {
         return this.pendingCloseContainer;
     }

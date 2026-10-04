@@ -22,22 +22,28 @@ import com.viaversion.viaversion.api.connection.UserConnection;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.storage.ChunkTracker;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class ChunkTrackerTickTask implements Runnable {
+
+    private final Set<ChunkTracker> pending = ConcurrentHashMap.newKeySet();
 
     @Override
     public void run() {
         for (UserConnection info : Via.getManager().getConnectionManager().getConnections()) {
             final ChunkTracker chunkTracker = info.get(ChunkTracker.class);
-            if (chunkTracker != null) {
+            if (chunkTracker != null && this.pending.add(chunkTracker)) {
                 info.getChannel().eventLoop().submit(() -> {
-                    if (!info.getChannel().isActive()) {
-                        return;
-                    }
-
                     try {
+                        if (!info.getChannel().isActive() || info.get(ChunkTracker.class) != chunkTracker) {
+                            return;
+                        }
                         chunkTracker.tick();
                     } catch (final Throwable e) {
                         BedrockProtocol.kickForIllegalState(info, "Error ticking chunk tracker. See console for details.", e);
+                    } finally {
+                        this.pending.remove(chunkTracker);
                     }
                 });
             }

@@ -201,7 +201,17 @@ public final class InventoryPackets {
             final BedrockItem storageItem = wrapper.read(itemRewriter.newItemType()); // storage item
 
             final InventoryTracker inventoryTracker = wrapper.user().get(InventoryTracker.class);
-            final Container container = inventoryTracker.getContainerClientbound((byte) containerId, containerName, storageItem);
+            Container container = inventoryTracker.getContainerClientbound((byte) containerId, containerName, storageItem);
+            if (container instanceof ChestContainer && container == inventoryTracker.getCurrentContainer()
+                    && (items.length == 27 || items.length == 54) && items.length != container.size()) {
+                container = new ChestContainer(wrapper.user(), container.containerId(), container.title(), container.position(), items.length);
+                inventoryTracker.replaceCurrentContainer(container);
+                final PacketWrapper openScreen = PacketWrapper.create(ClientboundPackets26_3.OPEN_SCREEN, wrapper.user());
+                openScreen.write(Types.VAR_INT, (int) container.javaContainerId()); // container id
+                openScreen.write(Types.VAR_INT, BedrockProtocol.MAPPINGS.getJavaMenuId(items.length == 54 ? "minecraft:generic_9x6" : "minecraft:generic_9x3")); // menu type
+                openScreen.write(Types.TAG, TextUtil.textComponentToNbt(container.title())); // title
+                openScreen.send(BedrockProtocol.class);
+            }
             if (container != null && container.setItems(items)) {
                 PacketFactory.writeJavaContainerSetContent(wrapper, container);
             } else {

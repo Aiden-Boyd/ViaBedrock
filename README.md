@@ -19,7 +19,7 @@ file).
 
 ### Fabric mod (Clientside)
 
-To use ViaBedrock as a Fabric mod, you can download the latest [ViaFabricPlus dev build](https://ci.viaversion.com/view/Platforms/job/ViaFabricPlus/).
+To use ViaBedrock as a Fabric mod, install [ViaFabricPlus](https://github.com/ViaVersion/ViaFabricPlus) and its separate [Bedrock protocol addon](https://github.com/ViaVersionAddons/ViaFabricPlus-Bedrock). For this fork, use the custom addon produced by the [Build ViaFabricPlus Bedrock Addon workflow](https://github.com/Aiden-Boyd/ViaBedrock/actions).
 
 ## Features
 
