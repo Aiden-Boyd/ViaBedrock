@@ -25,6 +25,7 @@ import com.mojang.realmsclient.RealmsMainScreen;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockRealmData;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockRealmEntry;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockRealmRows;
+import com.viaversion.viafabricplus.bedrock.integration.BedrockRealmList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,7 +35,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(RealmsMainScreen.RealmSelectionList.class)
-public abstract class MixinBedrockRealmSelectionList extends ObjectSelectionList<RealmsMainScreen.Entry> {
+public abstract class MixinBedrockRealmSelectionList extends ObjectSelectionList<RealmsMainScreen.Entry> implements BedrockRealmList {
 
     @Unique private String viaBedrock$selected;
 
@@ -50,11 +51,17 @@ public abstract class MixinBedrockRealmSelectionList extends ObjectSelectionList
     @Inject(method = "refreshEntries", at = @At("TAIL"))
     private void appendBedrockRealms(final RealmsMainScreen screen, final CallbackInfo ci) {
         for (BedrockRealmData data : ((BedrockRealmRows) screen).viaBedrock$realms()) {
-            final BedrockRealmEntry entry = new BedrockRealmEntry(screen, data);
-            this.addEntry(entry);
-            if (entry.key().equals(this.viaBedrock$selected)) {
-                this.setSelected(entry);
-            }
+            this.viaBedrock$addRealm(screen, data);
         }
+    }
+
+    @Override
+    public BedrockRealmEntry viaBedrock$addRealm(final RealmsMainScreen screen, final BedrockRealmData data) {
+        final BedrockRealmEntry entry = new BedrockRealmEntry(screen, data);
+        this.addEntry(entry);
+        if (entry.key().equals(this.viaBedrock$selected)) {
+            this.setSelected(entry);
+        }
+        return entry;
     }
 }

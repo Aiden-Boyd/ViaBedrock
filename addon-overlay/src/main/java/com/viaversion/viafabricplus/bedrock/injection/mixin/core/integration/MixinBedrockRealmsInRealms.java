@@ -84,8 +84,7 @@ public abstract class MixinBedrockRealmsInRealms implements BedrockRealmRows, Be
         data.name = "Menu QA Realm";
         data.motd = "Native Realm row";
         data.owner = "Menu QA";
-        final var entry = new BedrockRealmEntry((RealmsMainScreen) (Object) this, data);
-        this.realmSelectionList.children().add(entry);
+        final var entry = ((BedrockRealmList) this.realmSelectionList).viaBedrock$addRealm((RealmsMainScreen) (Object) this, data);
         this.updateLayout(RealmsMainScreen.LayoutState.LIST);
         this.realmSelectionList.setSelected(entry);
         return this.playButton.active && !this.configureButton.active && !this.renewButton.active && !this.leaveButton.active;
