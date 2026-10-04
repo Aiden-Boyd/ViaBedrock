@@ -70,12 +70,20 @@ public final class EntityMetadataRewriter {
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.SILENT), VersionedTypes.V26_3.entityDataTypes().booleanType, bedrockFlags.contains(ActorFlags.SILENT)));
                 javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.NO_GRAVITY), VersionedTypes.V26_3.entityDataTypes().booleanType, !bedrockFlags.contains(ActorFlags.HAS_GRAVITY)));
 
+                if (entity.javaType().isOrHasParent(EntityTypes26_3.LIVING_ENTITY)) {
+                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.LIVING_ENTITY_FLAGS),
+                        VersionedTypes.V26_3.entityDataTypes().byteType, (byte) (bedrockFlags.contains(ActorFlags.USINGITEM) ? 1 : 0)));
+                }
+
                 if (entity.javaType().isOrHasParent(EntityTypes26_3.MOB)) {
                     byte mobBitMask = 0;
                     if (bedrockFlags.contains(ActorFlags.NOAI)) {
                         mobBitMask |= 0x01;
                     }
 
+                    if (entity.javaType().isOrHasParent(EntityTypes26_3.ABSTRACT_SKELETON) && skeletonAttacking(entity)) {
+                        mobBitMask |= 0x04;
+                    }
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.MOB_FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, mobBitMask));
                 }
 
@@ -205,6 +213,12 @@ public final class EntityMetadataRewriter {
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.IS_CELEBRATING), VersionedTypes.V26_3.entityDataTypes().booleanType, isCelebrating));
                 }
 
+            }
+            case ROW_TIME_LEFT, ROW_TIME_RIGHT -> {
+                if (entity.javaType().isOrHasParent(EntityTypes26_3.ABSTRACT_BOAT)) {
+                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(id == ActorDataIds.ROW_TIME_LEFT ? EntityDataFields.PADDLE_LEFT : EntityDataFields.PADDLE_RIGHT),
+                        VersionedTypes.V26_3.entityDataTypes().booleanType, readNumber(entityData).floatValue() > 0F));
+                }
             }
             case VARIANT -> {
                 final int variant = readNumber(entityData).intValue();
@@ -635,8 +649,9 @@ public final class EntityMetadataRewriter {
                         break;
                     }
                     javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.ATTACK_TARGET), VersionedTypes.V26_3.entityDataTypes().varIntType, targetEntity.javaId()));
-                } else if (targetId != 0) {
-                    ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received TARGET for non-GUARDIAN entity " + entity.type() + " with non-zero value " + targetId);
+                } else if (entity.javaType().isOrHasParent(EntityTypes26_3.ABSTRACT_SKELETON)) {
+                    final byte flags = (byte) ((entity.entityFlags().contains(ActorFlags.NOAI) ? 1 : 0) | (skeletonAttacking(entity) ? 4 : 0));
+                    javaEntityData.add(new EntityData(entity.getJavaEntityDataIndex(EntityDataFields.MOB_FLAGS), VersionedTypes.V26_3.entityDataTypes().byteType, flags));
                 }
             }
             case AGENT, BALLOON_ANCHOR -> {
@@ -647,6 +662,13 @@ public final class EntityMetadataRewriter {
         }
 
         return true;
+    }
+
+    private static boolean skeletonAttacking(final Entity entity) {
+        final Set<ActorFlags> flags = entity.entityFlags();
+        final EntityData target = entity.entityData().get(ActorDataIds.TARGET);
+        return flags.contains(ActorFlags.FACING_TARGET_TO_RANGE_ATTACK) || flags.contains(ActorFlags.CHARGING)
+            || flags.contains(ActorFlags.USINGITEM) || (target != null && readNumber(target).longValue() != 0 && readNumber(target).longValue() != -1);
     }
 
     private static Number readNumber(final EntityData data) {

@@ -21,7 +21,6 @@ import com.viaversion.viaversion.api.minecraft.BlockFace;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ServerboundPackets26_3;
 import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.Container;
@@ -30,7 +29,6 @@ import net.raphimc.viabedrock.api.model.BlockConnections;
 import net.raphimc.viabedrock.protocol.rewriter.BlockStateRewriter;
 import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
-import net.raphimc.viabedrock.api.model.entity.Entity;
 import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
 import net.raphimc.viabedrock.protocol.ClientboundBedrockPackets;
@@ -43,7 +41,6 @@ import net.raphimc.viabedrock.protocol.data.enums.java.generated.GameMode;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.InteractionHand;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.PlayerActionAction;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
-import net.raphimc.viabedrock.protocol.model.EntityLink;
 import net.raphimc.viabedrock.protocol.model.Position3f;
 import net.raphimc.viabedrock.protocol.model.inventory.BedrockInventoryTransaction;
 import net.raphimc.viabedrock.protocol.model.inventory.InventoryActionData;
@@ -55,7 +52,6 @@ import net.raphimc.viabedrock.protocol.storage.EntityTracker;
 import net.raphimc.viabedrock.protocol.storage.InventoryTracker;
 import net.raphimc.viabedrock.protocol.types.BedrockTypes;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
@@ -310,62 +306,11 @@ public final class InteractionPackets {
                 }
             }
         });
-        protocol.registerClientbound(ClientboundBedrockPackets.SET_ENTITY_LINK, ClientboundPackets26_3.SET_PASSENGERS, wrapper -> {
-            final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
-
-            final EntityLink linkType = wrapper.read(BedrockTypes.ENTITY_LINK);
-            final Entity vehicle = entityTracker.getEntityByUid(linkType.fromEntityUniqueId());
-            if (vehicle == null) {
-                wrapper.cancel();
-                return;
-            }
-
-            // TODO: Handle Passenger type if needed
-            switch (linkType.type()) {
-                case Riding, Passenger -> { // TODO: This needs to be ordered properly based on the link types (rider first, then passengers)
-                    if (entityTracker.getEntityByUid(linkType.toEntityUniqueId()) == null) {
-                        wrapper.cancel();
-                        return;
-                    }
-                    vehicle.addPassenger(linkType.toEntityUniqueId());
-
-                    writeJavaPassengers(wrapper, entityTracker, vehicle);
-
-                    if (linkType.toEntityUniqueId() == entityTracker.getClientPlayer().uniqueId()) { // TODO: This could be applied to all passengers not just players
-                        // The player is now riding an entity, update the state
-                        entityTracker.getClientPlayer().setMountEntityRuntimeId(vehicle.runtimeId());
-                    }
-                }
-                case None -> { // Remove
-                    vehicle.removePassenger(linkType.toEntityUniqueId());
-
-                    writeJavaPassengers(wrapper, entityTracker, vehicle);
-
-                    if (linkType.toEntityUniqueId() == entityTracker.getClientPlayer().uniqueId()) { // TODO: This could be applied to all passengers not just players
-                        // The player is no longer riding an entity, update the state
-                        entityTracker.getClientPlayer().setMountEntityRuntimeId(-1);
-                        entityTracker.getClientPlayer().setRequestedDismount(false);
-                    }
-                }
-            }
+        protocol.registerClientbound(ClientboundBedrockPackets.SET_ENTITY_LINK, null, wrapper -> {
+            wrapper.cancel();
+            wrapper.user().get(EntityTracker.class).updateEntityLink(wrapper.read(BedrockTypes.ENTITY_LINK));
         });
 
-    }
-
-    private static void writeJavaPassengers(final PacketWrapper wrapper, final EntityTracker entityTracker, final Entity vehicle) {
-        final List<Entity> passengers = new ArrayList<>();
-        for (long passengerUid : vehicle.passengers()) {
-            final Entity passenger = entityTracker.getEntityByUid(passengerUid);
-            if (passenger != null) {
-                passengers.add(passenger);
-            }
-        }
-
-        wrapper.write(Types.VAR_INT, vehicle.javaId()); // vehicle
-        wrapper.write(Types.VAR_INT, passengers.size()); // number of tracked passengers
-        for (Entity passenger : passengers) {
-            wrapper.write(Types.VAR_INT, passenger.javaId()); // passenger id
-        }
     }
 
     private InteractionPackets() {

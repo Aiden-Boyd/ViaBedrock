@@ -449,6 +449,14 @@ public class ClientPlayerEntity extends PlayerEntity {
         this.blockBreakingInfo = blockBreakingInfo;
     }
 
+    @Override
+    public void setMountEntityRuntimeId(final long runtimeId) {
+        if (this.mountRuntimeId != runtimeId) {
+            this.requestedDismount = false;
+        }
+        super.setMountEntityRuntimeId(runtimeId);
+    }
+
     public void setRequestedDismount(final boolean requestedDismount) {
         this.requestedDismount = requestedDismount;
     }

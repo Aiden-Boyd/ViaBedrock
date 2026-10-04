@@ -24,6 +24,10 @@ import com.viaversion.viaversion.api.type.Types;
 import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 
 import net.raphimc.viabedrock.api.model.entity.Entity;
+import net.raphimc.viabedrock.api.model.entity.BoatEntity;
+import net.raphimc.viabedrock.protocol.model.Position2f;
+import java.util.List;
+import java.util.Objects;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.InteractPacketPayload_Action;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerActionType;
 import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
@@ -57,13 +61,40 @@ public final class PlayerActionPacketFactory {
         dismountPacket.sendToServer(BedrockProtocol.class);
     }
 
+    public static void writePredictedVehicle(final PacketWrapper wrapper, final BoatEntity boat) {
+        wrapper.write(Types.BOOLEAN, boat != null); // vehicle rotation present
+        if (boat != null) {
+            wrapper.write(BedrockTypes.POSITION_2F, new Position2f(boat.rotation().x(), boat.rotation().y()));
+        }
+        wrapper.write(Types.BOOLEAN, boat != null); // vehicle unique id present
+        if (boat != null) {
+            wrapper.write(BedrockTypes.VAR_LONG, boat.uniqueId());
+        }
+    }
+
+    public static void writeJavaVehicleMove(final PacketWrapper wrapper, final BoatEntity boat) {
+        wrapper.write(Types.DOUBLE, (double) boat.position().x());
+        wrapper.write(Types.DOUBLE, (double) boat.position().y() - boat.eyeOffset());
+        wrapper.write(Types.DOUBLE, (double) boat.position().z());
+        wrapper.write(Types.FLOAT, boat.javaYaw());
+        wrapper.write(Types.FLOAT, boat.rotation().x());
+    }
+
+    public static void sendJavaVehicleMove(final UserConnection user, final BoatEntity boat) {
+        final PacketWrapper movement = PacketWrapper.create(ClientboundPackets26_3.MOVE_VEHICLE, user);
+        writeJavaVehicleMove(movement, boat);
+        movement.send(BedrockProtocol.class);
+    }
+
     public static void sendJavaSetPassengers(final UserConnection user, final Entity vehicle) {
         final EntityTracker entityTracker = user.get(EntityTracker.class);
         final PacketWrapper setPassengersPacket = PacketWrapper.create(ClientboundPackets26_3.SET_PASSENGERS, user);
         setPassengersPacket.write(Types.VAR_INT, vehicle.javaId()); // vehicle
-        setPassengersPacket.write(Types.VAR_INT, vehicle.passengers().size()); // number of passengers
-        for (long passengerUid : vehicle.passengers()) {
-            setPassengersPacket.write(Types.VAR_INT, entityTracker.getEntityByUid(passengerUid).javaId()); // passenger id
+        final List<Integer> passengers = vehicle.passengers().stream().map(entityTracker::getEntityByUid)
+            .filter(Objects::nonNull).map(Entity::javaId).toList();
+        setPassengersPacket.write(Types.VAR_INT, passengers.size()); // number of passengers
+        for (int passengerId : passengers) {
+            setPassengersPacket.write(Types.VAR_INT, passengerId); // passenger id
         }
         setPassengersPacket.send(BedrockProtocol.class);
     }

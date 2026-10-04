@@ -68,6 +68,7 @@ public class Entity {
     // Mounting
     protected List<Long> passengers = new ArrayList<>();
     protected long mountRuntimeId = -1;
+    protected long riderUniqueId = -1;
 
     public Entity(final UserConnection user, final long uniqueId, final long runtimeId, final String type, final int javaId, final UUID javaUuid, final EntityTypes26_3 javaType) {
         this.user = user;
@@ -103,6 +104,7 @@ public class Entity {
     }
 
     public final void updateEntityData(final EntityData[] entityData, final List<EntityData> javaEntityData) {
+        final Map<ActorDataIds, EntityData> updates = new LinkedHashMap<>();
         for (EntityData data : entityData) {
             final ActorDataIds dataId = ActorDataIds.getByValue(data.id());
             if (dataId == null) {
@@ -115,11 +117,20 @@ public class Entity {
                 continue;
             }
             this.entityData.put(dataId, data);
-            if (!this.translateEntityData(dataId, data, javaEntityData)) {
+            updates.put(dataId, data);
+        }
+        for (Map.Entry<ActorDataIds, EntityData> update : updates.entrySet()) {
+            if (!this.translateEntityData(update.getKey(), update.getValue(), javaEntityData)) {
                 // TODO: Log warning when entity data translation is fully implemented
                 // ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Received unknown entity data: " + dataId + " for entity type: " + this.type);
             }
         }
+        final Map<Integer, EntityData> uniqueData = new LinkedHashMap<>();
+        for (EntityData data : javaEntityData) {
+            uniqueData.put(data.id(), data);
+        }
+        javaEntityData.clear();
+        javaEntityData.addAll(uniqueData.values());
         this.onEntityDataChanged();
     }
 
@@ -195,12 +206,20 @@ public class Entity {
     public Set<ActorFlags> entityFlags() {
         BigInteger combinedFlags = BigInteger.ZERO;
         if (this.entityData.containsKey(ActorDataIds.RESERVED_0)) {
-            combinedFlags = combinedFlags.add(BigInteger.valueOf(this.entityData.get(ActorDataIds.RESERVED_0).<Long>value().longValue()));
+            combinedFlags = unsignedFlagWord(this.entityData.get(ActorDataIds.RESERVED_0).<Long>value());
         }
         if (this.entityData.containsKey(ActorDataIds.RESERVED_092)) {
-            combinedFlags = combinedFlags.add(BigInteger.valueOf(this.entityData.get(ActorDataIds.RESERVED_092).<Long>value().longValue()).shiftLeft(64));
+            combinedFlags = combinedFlags.or(unsignedFlagWord(this.entityData.get(ActorDataIds.RESERVED_092).<Long>value()).shiftLeft(64));
         }
         return EnumUtil.getEnumSetFromBitmask(ActorFlags.class, combinedFlags, ActorFlags::getValue);
+    }
+
+    private static BigInteger unsignedFlagWord(final long word) {
+        return BigInteger.valueOf(word).and(BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE));
+    }
+
+    public float javaYaw() {
+        return this.rotation.y();
     }
 
     public String name() {
@@ -223,14 +242,32 @@ public class Entity {
         this.hasBossBar = hasBossBar;
     }
 
-    public void addPassenger(final long passengerRuntimeId) {
-        if (!this.passengers.contains(passengerRuntimeId)) {
-            this.passengers.add(passengerRuntimeId);
+    public void addPassenger(final long passengerUniqueId) {
+        this.addPassenger(passengerUniqueId, false);
+    }
+
+    public void addPassenger(final long passengerUniqueId, final boolean driver) {
+        this.passengers.remove(passengerUniqueId);
+        if (driver) {
+            this.riderUniqueId = passengerUniqueId;
+            this.passengers.add(0, passengerUniqueId);
+        } else {
+            if (this.riderUniqueId == passengerUniqueId) {
+                this.riderUniqueId = -1;
+            }
+            this.passengers.add(passengerUniqueId);
         }
+    }
+
+    public boolean isDriver(final long passengerUniqueId) {
+        return this.riderUniqueId == passengerUniqueId;
     }
 
     public void removePassenger(final long passengerRuntimeId) {
         this.passengers.remove(passengerRuntimeId);
+        if (this.riderUniqueId == passengerRuntimeId) {
+            this.riderUniqueId = -1;
+        }
     }
 
     public List<Long> passengers() {

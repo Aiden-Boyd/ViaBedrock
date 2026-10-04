@@ -36,14 +36,22 @@ import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.BlockState;
 import net.raphimc.viabedrock.api.model.entity.*;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
+import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
+import net.raphimc.viabedrock.protocol.model.EntityLink;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ActorLinkType;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 public class EntityTracker extends StoredObject {
+
+    private final Map<Long, EntityLink> pendingEntityLinks = new LinkedHashMap<>();
 
     private final AtomicInteger idCounter = new AtomicInteger(2);
 
@@ -59,7 +67,9 @@ public class EntityTracker extends StoredObject {
 
     public Entity addEntity(final long uniqueId, final long runtimeId, final String type, final EntityTypes26_3 javaType) {
         final UUID javaUuid = UUID.randomUUID();
-        if (javaType.isOrHasParent(EntityTypes26_3.ABSTRACT_HORSE)) {
+        if (javaType.isOrHasParent(EntityTypes26_3.ABSTRACT_BOAT)) {
+            return this.addEntity(new BoatEntity(this.user(), uniqueId, runtimeId, type, this.getNextJavaEntityId(), javaUuid, javaType));
+        } else if (javaType.isOrHasParent(EntityTypes26_3.ABSTRACT_HORSE)) {
             return this.addEntity(new AbstractHorseEntity(this.user(), uniqueId, runtimeId, type, this.getNextJavaEntityId(), javaUuid, javaType));
         } else if (javaType.isOrHasParent(EntityTypes26_3.MOB)) {
             return this.addEntity(new MobEntity(this.user(), uniqueId, runtimeId, type, this.getNextJavaEntityId(), javaUuid, javaType));
@@ -109,7 +119,66 @@ public class EntityTracker extends StoredObject {
         this.entities.remove(entity.uniqueId());
         this.runtimeIdToUniqueId.remove(entity.runtimeId());
         this.javaIdToUniqueId.remove(entity.javaId());
+        for (long passengerId : entity.passengers()) {
+            final Entity passenger = this.getEntityByUid(passengerId);
+            if (passenger != null && passenger.mountEntityRuntimeId() == entity.runtimeId()) {
+                passenger.setMountEntityRuntimeId(-1);
+            }
+        }
+        final Entity mount = this.getEntityByRid(entity.mountEntityRuntimeId());
+        if (mount != null) {
+            mount.removePassenger(entity.uniqueId());
+            PlayerActionPacketFactory.sendJavaSetPassengers(this.user(), mount);
+        }
+        this.pendingEntityLinks.values().removeIf(link -> link.fromEntityUniqueId() == entity.uniqueId() || link.toEntityUniqueId() == entity.uniqueId());
         entity.remove();
+    }
+
+    public void updateEntityLink(final EntityLink link) {
+        if (link.type() == null) {
+            return;
+        }
+        this.pendingEntityLinks.put(link.toEntityUniqueId(), link);
+        this.flushEntityLinks();
+    }
+
+    public void flushEntityLinks() {
+        final Iterator<EntityLink> iterator = this.pendingEntityLinks.values().iterator();
+        while (iterator.hasNext()) {
+            final EntityLink link = iterator.next();
+            final Entity vehicle = this.getEntityByUid(link.fromEntityUniqueId());
+            final Entity passenger = this.getEntityByUid(link.toEntityUniqueId());
+            if (vehicle == null || (passenger == null && link.type() != ActorLinkType.None)) {
+                continue;
+            }
+            iterator.remove();
+            if (link.type() == ActorLinkType.None) {
+                vehicle.removePassenger(link.toEntityUniqueId());
+                if (passenger != null && passenger.mountEntityRuntimeId() == vehicle.runtimeId()) {
+                    passenger.setMountEntityRuntimeId(-1);
+                }
+            } else {
+                final Entity previousMount = this.getEntityByRid(passenger.mountEntityRuntimeId());
+                if (previousMount != null && previousMount != vehicle) {
+                    previousMount.removePassenger(passenger.uniqueId());
+                    PlayerActionPacketFactory.sendJavaSetPassengers(this.user(), previousMount);
+                }
+                if (vehicle instanceof BoatEntity boat && link.type() == ActorLinkType.Riding && !boat.isDriver(passenger.uniqueId())) {
+                    boat.resetInputPrediction();
+                }
+                vehicle.addPassenger(passenger.uniqueId(), link.type() == ActorLinkType.Riding);
+                passenger.setMountEntityRuntimeId(vehicle.runtimeId());
+            }
+            PlayerActionPacketFactory.sendJavaSetPassengers(this.user(), vehicle);
+        }
+    }
+
+    public BoatEntity controlledBoat() {
+        if (this.clientPlayerEntity == null) {
+            return null;
+        }
+        final Entity mount = this.getEntityByRid(this.clientPlayerEntity.mountEntityRuntimeId());
+        return mount instanceof BoatEntity boat && boat.isDriver(this.clientPlayerEntity.uniqueId()) ? boat : null;
     }
 
     public void spawnItemFrame(final BlockPosition position, final BlockState blockState) {
@@ -158,6 +227,7 @@ public class EntityTracker extends StoredObject {
     }
 
     public void tick() {
+        this.flushEntityLinks();
         for (Entity entity : this.entities.values()) {
             if (entity != this.clientPlayerEntity) {
                 entity.tick();
@@ -184,7 +254,8 @@ public class EntityTracker extends StoredObject {
     }
 
     public Entity getEntityByJid(final int javaId) {
-        return this.entities.get((long) this.javaIdToUniqueId.get(javaId));
+        final Long uniqueId = this.javaIdToUniqueId.get(javaId);
+        return uniqueId == null ? null : this.entities.get(uniqueId.longValue());
     }
 
     public ClientPlayerEntity getClientPlayer() {

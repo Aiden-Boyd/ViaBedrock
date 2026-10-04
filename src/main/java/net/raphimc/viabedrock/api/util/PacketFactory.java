@@ -110,7 +110,7 @@ public final class PacketFactory {
     public static void sendJavaRotateHead(final UserConnection user, final Entity entity) {
         final PacketWrapper rotateHead = PacketWrapper.create(ClientboundPackets26_3.ROTATE_HEAD, user);
         rotateHead.write(Types.VAR_INT, entity.javaId()); // entity id
-        rotateHead.write(Types.BYTE, MathUtil.float2Byte(entity.rotation().z())); // head yaw
+        rotateHead.write(Types.BYTE, MathUtil.float2Byte(entity instanceof net.raphimc.viabedrock.api.model.entity.BoatEntity ? entity.javaYaw() : entity.rotation().z())); // head yaw
         rotateHead.send(BedrockProtocol.class);
     }
 

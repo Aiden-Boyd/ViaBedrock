@@ -41,6 +41,7 @@ import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PositionMode
 import net.raphimc.viabedrock.protocol.data.enums.java.Relative;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.EquipmentSlot;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.PlayerInfoUpdateAction;
+import net.raphimc.viabedrock.protocol.model.EntityLink;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.PlayerAbilities;
 import net.raphimc.viabedrock.protocol.model.Position3f;
@@ -75,7 +76,7 @@ public final class OtherPlayerPackets {
             final EntityData[] entityData = wrapper.read(BedrockTypes.ENTITY_DATA_ARRAY); // entity data
             wrapper.read(BedrockTypes.ENTITY_PROPERTIES); // entity properties
             final PlayerAbilities abilities = wrapper.read(BedrockTypes.PLAYER_ABILITIES); // abilities
-            wrapper.read(BedrockTypes.ENTITY_LINK_ARRAY); // entity links
+            final EntityLink[] entityLinks = wrapper.read(BedrockTypes.ENTITY_LINK_ARRAY); // entity links
 
             final PlayerEntity entity = entityTracker.addEntity(new PlayerEntity(wrapper.user(), entityRuntimeId, entityTracker.getNextJavaEntityId(), uuid, abilities));
             entity.setPosition(position);
@@ -117,6 +118,10 @@ public final class OtherPlayerPackets {
 
             entity.sendInitialEntityData();
             entity.updateEntityData(entityData);
+            for (EntityLink link : entityLinks) {
+                entityTracker.updateEntityLink(link);
+            }
+            entityTracker.flushEntityLinks();
         });
         protocol.registerClientbound(ClientboundBedrockPackets.MOVE_PLAYER, ClientboundPackets26_3.ENTITY_POSITION_SYNC, wrapper -> {
             final EntityTracker entityTracker = wrapper.user().get(EntityTracker.class);
