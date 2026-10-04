@@ -19,35 +19,24 @@ package net.raphimc.viabedrock.api.model.container.block;
 
 import com.viaversion.viaversion.api.connection.UserConnection;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
-import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
-import com.viaversion.viaversion.api.type.Types;
-import com.viaversion.viaversion.api.type.types.version.VersionedTypes;
 import com.viaversion.viaversion.libs.mcstructs.text.TextComponent;
-import com.viaversion.viaversion.protocols.v26_2to26_3.packet.ClientboundPackets26_3;
 
-import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.Container;
 import net.raphimc.viabedrock.api.util.PacketFactory;
-import net.raphimc.viabedrock.protocol.BedrockProtocol;
-import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
-import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.data.generated.bedrock.CustomBlockTags;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
 import net.raphimc.viabedrock.protocol.model.FullContainerName;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestAction;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestInfo;
-import net.raphimc.viabedrock.protocol.model.inventory.ItemStackRequestSlotInfo;
 import net.raphimc.viabedrock.protocol.model.recipe.ShapedRecipe;
 import net.raphimc.viabedrock.protocol.model.recipe.ShapelessRecipe;
-import net.raphimc.viabedrock.protocol.rewriter.ItemRewriter;
-import net.raphimc.viabedrock.protocol.storage.*;
+import net.raphimc.viabedrock.protocol.storage.CraftingDataStorage;
+import net.raphimc.viabedrock.protocol.storage.CraftingDataTracker;
 
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.logging.Level;
+import java.util.Map;
 
 public class CraftingTableContainer extends Container {
 
@@ -101,123 +90,62 @@ public class CraftingTableContainer extends Container {
     }
 
     @Override
-    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
-        boolean result = false;
-        if (javaSlot != 0) {
-            // Handle click first so we update the crafting grid before checking for a recipe
-            result = super.handleClick(revision, javaSlot, button, action);
+    public boolean setItems(final BedrockItem[] items) {
+        if (items.length != this.size() && items.length != 54) {
+            return false;
         }
-
-        final ItemRewriter itemRewriter = user.get(ItemRewriter.class);
-        final CraftingDataTracker tracker = user.get(CraftingDataTracker.class);
-        final CraftingDataStorage craftingDataStorage = tracker.getRecipeData(this, "crafting_table");
-        BedrockItem resultItem = BedrockItem.empty();
-        if (craftingDataStorage != null) {
-            // Valid recipe found, show output
-            switch (craftingDataStorage.type()) {
-                case SHAPELESS -> resultItem = ((ShapelessRecipe) craftingDataStorage.recipe()).getResults().get(0);
-                case SHAPED -> resultItem = ((ShapedRecipe) craftingDataStorage.recipe()).getResults().get(0);
-                default -> ViaBedrock.getPlatform().getLogger().log(Level.WARNING, "Unknown recipe type for crafting: " + craftingDataStorage.type());
-            }
-        } else {
-            // No valid recipe found
-            return result;
+        for (int slot = 0; slot < this.size(); slot++) {
+            this.setItem(this.bedrockSlot(slot), items.length == 54 ? items[this.bedrockSlot(slot)] : items[slot]);
         }
-
-        //this.setItem(0, resultItem);
-        final PacketWrapper containerSlot = PacketWrapper.create(ClientboundPackets26_3.CONTAINER_SET_SLOT, user);
-        containerSlot.write(Types.VAR_INT, (int) this.containerId());
-        containerSlot.write(Types.VAR_INT, revision);
-        containerSlot.write(Types.SHORT, (short) 0); // Output slot
-        containerSlot.write(VersionedTypes.V26_3.item, itemRewriter.javaItem(resultItem));
-        containerSlot.send(BedrockProtocol.class);
-
-        if (javaSlot != 0) {
-            // Handle click first so we update the crafting grid before checking for a recipe
-            return result;
-        }
-
-        final InventoryTracker inventoryTracker = user.get(InventoryTracker.class);
-        final InventoryRequestTracker inventoryRequestTracker = user.get(InventoryRequestTracker.class);
-
-        final List<Container> prevContainers = new ArrayList<>();
-        prevContainers.add(this.copy());
-        prevContainers.add(inventoryTracker.getInventoryContainer().copy());
-        final Container prevCursorContainer = inventoryTracker.getHudContainer().copy();
-
-        final int craftableAmount = 1;
-
-        final int bedrockSlot = this.bedrockSlot(javaSlot);
-        // TODO: shift click = max to inventory
-
-        final List<ItemStackRequestAction> actions = new ArrayList<>();
-        actions.add(new ItemStackRequestAction.CraftRecipeAction(craftingDataStorage.networkId(), craftableAmount));
-        //actions.add(new ItemStackRequestAction.CraftResultsDeprecatedAction(resultItems, 1)); //TODO: Deprecated action, hopefully removed in the future
-
-        for (int i = 1; i <= 9; i++) {
-            final int inputSlot = i + 31; // Crafting grid slots in bedrock
-            final BedrockItem item = this.getItem(inputSlot);
-            if (!item.isEmpty() && item.amount() > 0) {
-                final int toConsume = Math.min(item.amount(), craftableAmount);
-                actions.add(new ItemStackRequestAction.ConsumeAction(
-                        toConsume,
-                        new ItemStackRequestSlotInfo(
-                                this.getFullContainerName(inputSlot),
-                                (byte) inputSlot,
-                                this.getItem(inputSlot).netId()
-                        )
-                ));
-            }
-        }
-
-        final int nextRequestId = inventoryRequestTracker.nextRequestId();
-        actions.add(
-                new ItemStackRequestAction.TakeAction(
-                        craftableAmount * resultItem.amount(), // Total amount to take
-                        new ItemStackRequestSlotInfo(
-                                this.getFullContainerName(bedrockSlot),
-                                (byte) bedrockSlot,
-                                nextRequestId // TODO
-                        ),
-                        new ItemStackRequestSlotInfo(
-                                new FullContainerName(ContainerEnumName.CursorContainer, null),
-                                (byte) 0,
-                                0 // The stackNetworkId is not known yet
-                        )
-                )
-        );
-
-        final ItemStackRequestInfo request = new ItemStackRequestInfo(
-                nextRequestId,
-                actions,
-                List.of(),
-                TextProcessingEventOrigin.unknown
-        );
-
-        inventoryRequestTracker.addRequest(new InventoryRequestStorage(request, revision, prevCursorContainer, prevContainers)); // Store the request to track it later
-        PlayerActionPacketFactory.sendBedrockInventoryRequest(user, new ItemStackRequestInfo[]{request});
-
-        inventoryTracker.getHudContainer().setItem(0, resultItem); // Update cursor to the crafted item
-        for (int i = 1; i <= 9; i++) {
-            final int inputSlot = i + 31; // Crafting grid slots in bedrock
-            BedrockItem item = this.getItem(inputSlot);
-            if (!item.isEmpty() && item.amount() > 0) {
-                final int toConsume = Math.min(item.amount(), craftableAmount);
-                item = item.copy();
-                item.setAmount(item.amount() - toConsume);
-                if (item.amount() > 0) {
-                    this.setItem(inputSlot, item);
-                } else {
-                    this.setItem(inputSlot, BedrockItem.empty());
-                }
-            } else {
-                this.setItem(inputSlot, BedrockItem.empty());
-            }
-        }
-        PacketFactory.sendJavaContainerSetContent(user, this);
-
-        //TODO: Re-Update the output slot based on remaining items in the crafting grid
+        this.updateCraftingResult();
         return true;
+    }
+
+    @Override
+    protected void onSlotChanged(final int slot, final BedrockItem previous, final BedrockItem item) {
+        if (slot >= 1 && slot <= 9) {
+            this.updateCraftingResult();
+        }
+    }
+
+    public void updateCraftingResult() {
+        final CraftingDataStorage recipe = this.user.get(CraftingDataTracker.class).getRecipeData(this, "crafting_table");
+        final List<BedrockItem> results = recipe == null ? List.of()
+                : recipe.recipe() instanceof ShapedRecipe shaped ? shaped.getResults()
+                : recipe.recipe() instanceof ShapelessRecipe shapeless ? shapeless.getResults() : List.of();
+        super.setItem(0, results.size() == 1 ? results.get(0).copy() : BedrockItem.empty());
+    }
+
+    @Override
+    public boolean handleClick(final int revision, final short javaSlot, final byte button, final ContainerInput action) {
+        if (javaSlot != 0 || action == ContainerInput.QUICK_CRAFT) {
+            final boolean handled = super.handleClick(revision, javaSlot, button, action);
+            this.updateCraftingResult();
+            if (action != ContainerInput.QUICK_CRAFT || (button & 3) == 2) {
+                PacketFactory.sendJavaContainerSetContent(this.user, this);
+            }
+            return handled;
+        }
+        if ((action != ContainerInput.PICKUP && action != ContainerInput.QUICK_MOVE) || (button != 0 && button != 1)) {
+            return false;
+        }
+        final CraftingDataTracker recipes = this.user.get(CraftingDataTracker.class);
+        final CraftingDataStorage recipe = recipes.getRecipeData(this, "crafting_table");
+        if (recipe == null) {
+            return false;
+        }
+        this.updateCraftingResult();
+        final int[] consumption = recipes.getIngredientConsumption(this, recipe.recipe());
+        if (consumption == null) {
+            return false;
+        }
+        final Map<Integer, Integer> consumed = new LinkedHashMap<>();
+        for (int slot = 0; slot < consumption.length; slot++) {
+            if (consumption[slot] > 0) {
+                consumed.put(slot + 32, consumption[slot]);
+            }
+        }
+        return this.craftOutput(revision, recipe.networkId(), this.getItem(50), consumed, action == ContainerInput.QUICK_MOVE);
     }
 
 }
