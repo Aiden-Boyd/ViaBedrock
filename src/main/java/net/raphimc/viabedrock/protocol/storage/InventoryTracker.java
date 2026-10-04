@@ -110,15 +110,19 @@ public class InventoryTracker extends StoredObject {
         if (containerName.name() == ContainerEnumName.ArmorContainer) {
             return this.armorContainer;
         }
+        if (this.currentContainer != null) {
+            final int javaSlot = this.currentContainer.javaSlot(slot);
+            if (javaSlot >= 0 && javaSlot < this.currentContainer.size() && this.currentContainer.bedrockSlot(javaSlot) == slot
+                    && containerName.equals(this.currentContainer.getFullContainerName(slot))) {
+                return this.currentContainer;
+            }
+        }
         if (containerName.name() == ContainerEnumName.CursorContainer || containerName.name() == ContainerEnumName.CraftingInputContainer
                 || containerName.name() == ContainerEnumName.CreatedOutputContainer || containerName.name() == ContainerEnumName.CraftingOutputPreviewContainer) {
             return this.hudContainer;
         }
         if (containerName.name() == ContainerEnumName.DynamicContainer) {
             return this.dynamicContainerRegistry.get(containerName);
-        }
-        if (this.currentContainer != null && containerName.equals(this.currentContainer.getFullContainerName(slot))) {
-            return this.currentContainer;
         }
         return null;
     }
