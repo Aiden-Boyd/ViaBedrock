@@ -26,6 +26,7 @@ import net.raphimc.viabedrock.ViaBedrock;
 import net.raphimc.viabedrock.api.model.container.player.InventoryContainer;
 import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerType;
+import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.ContainerEnumName;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
 import net.raphimc.viabedrock.protocol.data.enums.java.generated.ContainerInput;
 import net.raphimc.viabedrock.protocol.model.BedrockItem;
@@ -95,6 +96,7 @@ public abstract class Container {
             case SWAP -> this.singletonAction(this.handleSwapClick(clickContext, javaSlot, button));
             case QUICK_MOVE -> this.handleQuickMoveClick(clickContext, javaSlot);
             case THROW -> this.singletonAction(this.handleThrowClick(clickContext, javaSlot, button));
+            case PICKUP_ALL -> this.handlePickupAllClick(clickContext, button);
             default -> List.of();
         };
 
@@ -366,6 +368,51 @@ public abstract class Container {
             }
         }
 
+        return actions;
+    }
+
+    private List<ItemStackRequestAction> handlePickupAllClick(final ClickContext context, final byte button) {
+        final Container cursor = context.inventoryTracker.getHudContainer();
+        final BedrockItem cursorItem = cursor.getItem(0);
+        if (cursorItem.isEmpty() || cursorItem.netId() == null || (button != 0 && button != 1)) {
+            return List.of();
+        }
+        final int maximum = this.user.get(ItemRewriter.class).maxStackSize(cursorItem);
+        int amount = cursorItem.amount();
+        final List<SlotRef> sources = new ArrayList<>();
+        final Container inventory = this instanceof InventoryContainer ? this : context.inventoryTracker.getInventoryContainer();
+        context.prevContainers.add(inventory.copy());
+        if (!(this instanceof InventoryContainer)) {
+            for (int slot = 0; slot < this.size(); slot++) {
+                final int bedrockSlot = this.bedrockSlot(slot);
+                final ContainerEnumName name = this.getFullContainerName(bedrockSlot).name();
+                if (name != ContainerEnumName.CraftingOutputPreviewContainer && name != ContainerEnumName.CreatedOutputContainer) {
+                    sources.add(new SlotRef(this, bedrockSlot));
+                }
+            }
+        }
+        for (int slot = 9; slot < 45; slot++) {
+            sources.add(new SlotRef(inventory, inventory.bedrockSlot(slot)));
+        }
+        final List<ItemStackRequestAction> actions = new ArrayList<>();
+        for (int pass = 0; pass < 2 && amount < maximum; pass++) {
+            for (int index = 0; index < sources.size() && amount < maximum; index++) {
+                final SlotRef source = sources.get(button == 0 ? index : sources.size() - 1 - index);
+                final BedrockItem item = source.container().getItem(source.bedrockSlot());
+                if (item.isEmpty() || item.netId() == null || item.isDifferent(cursorItem) || (pass == 0 && item.amount() >= maximum)) {
+                    continue;
+                }
+                final int taken = Math.min(maximum - amount, item.amount());
+                actions.add(new ItemStackRequestAction.TakeAction(taken,
+                        new ItemStackRequestSlotInfo(source.container().getFullContainerName(source.bedrockSlot()), (byte) source.bedrockSlot(), item.netId()),
+                        new ItemStackRequestSlotInfo(cursor.getFullContainerName(0), (byte) 0, cursorItem.netId())));
+                source.container().setItem(source.bedrockSlot(), this.itemAfterRemovingAmount(item, taken));
+                amount += taken;
+            }
+        }
+        if (!actions.isEmpty()) {
+            cursor.setItem(0, this.copyStackWithAmount(cursorItem, amount));
+        }
         return actions;
     }
 
