@@ -22,6 +22,7 @@ import com.viaversion.viaversion.api.protocol.packet.PacketWrapper;
 import com.viaversion.viaversion.protocol.packet.PacketWrapperImpl;
 import com.viaversion.viaversion.api.type.Types;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.ByteBuf;
 import net.raphimc.viabedrock.api.model.entity.ClientPlayerEntity;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.PlayerActionType;
 import org.junit.jupiter.api.Test;
@@ -91,17 +92,19 @@ final class PlayerAuthInputBlockActionsTest {
         }
     }
 
-    private static int readUnsignedVarInt(final io.netty.buffer.ByteBuf buffer) {
+    private static int readUnsignedVarInt(final ByteBuf buffer) {
         int value = 0;
         for (int shift = 0; shift < 35; shift += 7) {
             final int next = buffer.readUnsignedByte();
             value |= (next & 0x7F) << shift;
-            if ((next & 0x80) == 0) return value;
+            if ((next & 0x80) == 0) {
+                return value;
+            }
         }
         throw new AssertionError("Invalid varint");
     }
 
-    private static int readSignedVarInt(final io.netty.buffer.ByteBuf buffer) {
+    private static int readSignedVarInt(final ByteBuf buffer) {
         final int value = readUnsignedVarInt(buffer);
         return (value >>> 1) ^ -(value & 1);
     }
@@ -115,4 +118,5 @@ final class PlayerAuthInputBlockActionsTest {
     }
 
 }
+
 
