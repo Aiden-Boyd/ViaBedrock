@@ -93,8 +93,10 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
         if (row.isEmpty()) {
             return false;
         }
-        this.serverSelectionList.setSelected(row.get());
-        if (!(row.get() instanceof ServerSelectionList.OnlineServerEntry) || !this.joinButton.active || this.editButton.active || this.deleteButton.active) {
+        final var clickable = com.viaversion.viafabricplus.bedrock.integration.BedrockFriendEntrySmoke.verify(
+            (JoinMultiplayerScreen) (Object) this, this.serverSelectionList, fixture, row.get());
+        this.serverSelectionList.setSelected(clickable);
+        if (!(clickable instanceof ServerSelectionList.OnlineServerEntry) || !this.joinButton.active || this.editButton.active || this.deleteButton.active) {
             return false;
         }
         final var updated = new FriendWorld("menu-qa", "0", "Menu QA", "Menu QA World", "26.3", 2, 8, 0, null);

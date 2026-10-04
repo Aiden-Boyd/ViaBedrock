@@ -34,7 +34,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
-public final class BedrockFriendEntry extends ServerSelectionList.OnlineServerEntry {
+public class BedrockFriendEntry extends ServerSelectionList.OnlineServerEntry {
 
     private final JoinMultiplayerScreen screen;
     private final ServerSelectionList list;
@@ -99,7 +99,8 @@ public final class BedrockFriendEntry extends ServerSelectionList.OnlineServerEn
 
     @Override
     public boolean mouseClicked(final MouseButtonEvent event, final boolean doubleClick) {
-        if (event.button() != 0) {
+        // Minecraft 26.3 uses 1 for the primary mouse button (not GLFW's old 0).
+        if (event.button() != 1) {
             return false;
         }
         this.list.setSelected(this);

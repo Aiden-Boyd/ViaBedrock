@@ -25,6 +25,8 @@ import com.viaversion.viafabricplus.bedrock.integration.BedrockFriendEntry;
 import com.viaversion.viafabricplus.bedrock.integration.BedrockServerList;
 import com.viaversion.viafabricplus.bedrock.friends.BedrockFriendsService.FriendWorld;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Collection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
@@ -36,16 +38,17 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ServerSelectionList.class)
 public abstract class MixinBedrockServerSelectionList extends ObjectSelectionList<ServerSelectionList.Entry> implements BedrockServerList {
 
     @Shadow @Final private JoinMultiplayerScreen screen;
+    @Shadow @Final private ServerSelectionList.Entry lanHeader;
     @Shadow protected abstract void refreshEntries();
     @Unique private List<FriendWorld> viaBedrock$worlds = List.of();
     @Unique private Component viaBedrock$status;
-    @Unique private String viaBedrock$selection;
     @Unique private Object viaBedrock$account;
 
     public MixinBedrockServerSelectionList(final Minecraft client, final int width, final int height, final int y, final int itemHeight) {
@@ -64,32 +67,24 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
         this.refreshEntries();
     }
 
-    @Inject(method = "refreshEntries", at = @At("HEAD"))
-    private void rememberFriendSelection(final CallbackInfo ci) {
-        this.viaBedrock$selection = this.getSelected() instanceof BedrockFriendEntry friend ? friend.key() : null;
+    @ModifyArg(method = "refreshEntries", at = @At(value = "INVOKE",
+        target = "Lnet/minecraft/client/gui/screens/multiplayer/ServerSelectionList;replaceEntries(Ljava/util/Collection;)V"), index = 0)
+    private Collection<ServerSelectionList.Entry> insertFriendRows(final Collection<ServerSelectionList.Entry> entries) {
+        final List<ServerSelectionList.Entry> rows = new ArrayList<>(entries);
+        int index = rows.indexOf(this.lanHeader);
+        if (index < 0) index = rows.size();
+        if (this.viaBedrock$status != null) {
+            for (FriendWorld world : this.viaBedrock$worlds) {
+                rows.add(index++, new BedrockFriendEntry(this.screen, (ServerSelectionList) (Object) this, world, Component.empty()));
+            }
+        }
+        return rows;
     }
 
     @Inject(method = "refreshEntries", at = @At("TAIL"))
-    private void appendFriends(final CallbackInfo ci) {
-        if (this.viaBedrock$status == null) {
-            return;
-        }
-        boolean restoredSelection = false;
-        for (FriendWorld world : this.viaBedrock$worlds) {
-            this.viaBedrock$add(new BedrockFriendEntry(this.screen, (ServerSelectionList) (Object) this, world, Component.empty()));
-            restoredSelection |= world.handleId().equals(this.viaBedrock$selection);
-        }
-        if (this.viaBedrock$selection != null && !restoredSelection) {
+    private void clearOfflineFriendSelection(final CallbackInfo ci) {
+        if (this.getSelected() instanceof BedrockFriendEntry friend && !this.children().contains(friend)) {
             this.setSelected(null);
         }
     }
-
-    @Unique
-    private void viaBedrock$add(final BedrockFriendEntry entry) {
-        this.addEntry(entry);
-        if (entry.key().equals(this.viaBedrock$selection)) {
-            this.setSelected(entry);
-        }
-    }
 }
-
