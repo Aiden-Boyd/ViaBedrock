@@ -1,0 +1,31 @@
+name: Inspect Minecraft menu input
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/inventory-current]
+    paths: ['.github/workflows/inspect-minecraft-menu.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Download official client and inspect menu bytecode
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, zipfile
+          manifest=json.load(urllib.request.urlopen('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'))
+          version=next(v for v in manifest['versions'] if v['id']=='26.3')
+          meta=json.load(urllib.request.urlopen(version['url']))
+          urllib.request.urlretrieve(meta['downloads']['client']['url'],'client.jar')
+          PY
+          javap -classpath client.jar -private -c net.minecraft.client.gui.screens.multiplayer.ServerSelectionList 'net.minecraft.client.gui.screens.multiplayer.ServerSelectionList$OnlineServerEntry' net.minecraft.client.gui.components.AbstractSelectionList 'net.minecraft.client.gui.components.AbstractSelectionList$Entry' net.minecraft.client.gui.components.ObjectSelectionList net.minecraft.client.input.MouseButtonEvent > menu-bytecode.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-menu-bytecode
+          path: menu-bytecode.txt
+          retention-days: 7
