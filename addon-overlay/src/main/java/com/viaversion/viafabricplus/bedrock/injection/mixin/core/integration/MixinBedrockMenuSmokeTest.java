@@ -94,6 +94,20 @@ public abstract class MixinBedrockMenuSmokeTest {
             if (++this.viaBedrock$smokeWait < 10) {
                 return;
             }
+            this.viaBedrock$smokeScreen = new com.mojang.realmsclient.gui.screens.RealmsJoinRealmWithCodeScreen(
+                this.viaBedrock$smokeScreen, () -> { throw new AssertionError("Smoke must not redeem an invite"); });
+            client.gui.setScreen(this.viaBedrock$smokeScreen);
+            this.viaBedrock$smokePhase = 5;
+            this.viaBedrock$smokeWait = 0;
+        } else if (this.viaBedrock$smokePhase == 5) {
+            if (++this.viaBedrock$smokeWait < 10) return;
+            final var field = this.viaBedrock$smokeScreen.children().stream()
+                .filter(net.minecraft.client.gui.components.EditBox.class::isInstance)
+                .map(net.minecraft.client.gui.components.EditBox.class::cast).findFirst().orElseThrow();
+            final String link = "https://realms.gg/AbCdEfGhIjKlMnOp";
+            field.setValue(link);
+            if (!link.equals(field.getValue())) throw new AssertionError("Realm invite link was truncated");
+            ViaFabricPlusBedrock.impl().logger().info("BEDROCK_REALM_INVITE_SCREEN_SMOKE_PASSED");
             ViaFabricPlusBedrock.impl().logger().info("BEDROCK_NATIVE_MENU_SMOKE_PASSED");
             client.stop();
         }
