@@ -233,7 +233,7 @@ public class ChunkTracker extends StoredObject {
 
     public int getJavaBlockState(final BlockPosition blockPosition) {
         final BedrockChunkSection chunkSection = this.getChunkSection(blockPosition);
-        if (chunkSection == null) {
+        if (chunkSection == null || chunkSection.palettesCount(PaletteType.BLOCKS) == 0) {
             return ProtocolConstants.JAVA_AIR_ID;
         }
 
@@ -270,6 +270,9 @@ public class ChunkTracker extends StoredObject {
     public int getJavaBlockState(final BedrockChunkSection section, final int sectionX, final int sectionY, final int sectionZ) {
         final BlockStateRewriter blockStateRewriter = this.user().get(BlockStateRewriter.class);
         final List<DataPalette> blockPalettes = section.palettes(PaletteType.BLOCKS);
+        if (blockPalettes.isEmpty()) {
+            return ProtocolConstants.JAVA_AIR_ID;
+        }
 
         final int blockState0 = blockPalettes.get(0).idAt(sectionX, sectionY, sectionZ);
         int remappedBlockState = blockStateRewriter.javaId(blockState0);
