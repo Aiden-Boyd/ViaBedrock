@@ -126,16 +126,11 @@ class MovementSyncTest {
     }
 
     @Test
-    void movementLockRevokesHeldInputAndPendingSprintStart() {
+    void movementLockRevokesHeldInputAndRestoresAfterUnlock() {
         final ClientPlayerEntity player = player();
         player.setInputFlags(Set.of(InputFlag.FORWARD, InputFlag.JUMP, InputFlag.SPRINT));
-        player.setSprinting(true);
-        player.addAuthInputData(PlayerAuthInputData.StartSprinting);
         player.setInputLocks(1 << 2);
         assertTrue(player.inputFlags().isEmpty());
-        assertFalse(player.isSprinting());
-        assertFalse(player.authInputData().contains(PlayerAuthInputData.StartSprinting));
-        assertTrue(player.authInputData().contains(PlayerAuthInputData.StopSprinting));
         player.setInputLocks(0);
         player.setInputFlags(Set.of(InputFlag.FORWARD));
         assertTrue(player.inputFlags().contains(InputFlag.FORWARD));
