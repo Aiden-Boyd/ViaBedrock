@@ -19,6 +19,8 @@ package net.raphimc.viabedrock.api.model.container.player;
 
 import com.viaversion.viaversion.api.connection.UserConnection;
 import net.raphimc.viabedrock.api.model.container.Container;
+import net.raphimc.viabedrock.api.model.container.block.CraftingTableContainer;
+import net.raphimc.viabedrock.api.model.container.block.StonecutterContainer;
 import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.PlayerActionPacketFactory;
 import net.raphimc.viabedrock.protocol.data.enums.bedrock.generated.TextProcessingEventOrigin;
@@ -58,6 +60,12 @@ public class HudContainer extends InventoryRedirectContainer {
 
     @Override
     protected void onSlotChanged(final int slot, final BedrockItem oldItem, final BedrockItem newItem) {
+        final Container open = this.user.get(InventoryTracker.class).getCurrentContainer();
+        if ((open instanceof CraftingTableContainer && (slot >= 32 && slot <= 40 || slot == 50))
+                || (open instanceof StonecutterContainer && (slot == 3 || slot == 50))) {
+            open.setItem(slot, newItem);
+            PacketFactory.sendJavaContainerSetContent(this.user, open);
+        }
         if (slot >= 28 && slot <= 31) {
             this.updateCraftingResult();
         }
