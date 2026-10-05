@@ -52,6 +52,7 @@ import net.raphimc.viabedrock.api.chunk.section.BedrockChunkSectionImpl;
 import net.raphimc.viabedrock.api.model.BedrockBlockState;
 import net.raphimc.viabedrock.api.model.BlockState;
 import net.raphimc.viabedrock.api.model.BlockConnections;
+import net.raphimc.viabedrock.api.model.BlockConnectionProperties;
 import net.raphimc.viabedrock.api.model.BlockPredictionQueue;
 import net.raphimc.viabedrock.api.util.PacketFactory;
 import net.raphimc.viabedrock.protocol.BedrockProtocol;
@@ -88,6 +89,7 @@ public class ChunkTracker extends StoredObject {
     private final Long2ObjectMap<BedrockChunk> chunks = new Long2ObjectOpenHashMap<>();
     private final Set<Long> dirtyChunks = new LinkedHashSet<>();
     private final Set<BlockPosition> connectedBlockUpdates = new LinkedHashSet<>();
+    private final Map<Long, Set<BlockPosition>> neighbourDependentBlocks = new HashMap<>();
     private final BlockPredictionQueue blockPredictions = new BlockPredictionQueue();
 
     private final Long2ObjectMap<int[][]> javaBlockStateCache = new Long2ObjectOpenHashMap<>(); // chunk key -> per section java block states
@@ -180,6 +182,8 @@ public class ChunkTracker extends StoredObject {
     public void unloadChunk(final ChunkPosition chunkPos) {
         final long chunkKey = chunkPos.chunkKey();
         this.chunks.remove(chunkKey);
+        this.neighbourDependentBlocks.remove(chunkKey);
+        this.refreshBorderConnections(chunkPos.chunkX(), chunkPos.chunkZ());
         this.dirtyChunks.remove(chunkKey);
         this.javaBlockStateCache.remove(chunkKey);
         this.chunkLight.remove(chunkKey);
@@ -248,7 +252,9 @@ public class ChunkTracker extends StoredObject {
         final BlockStateRewriter rewriter = this.user().get(BlockStateRewriter.class);
         final BlockState javaState = BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(baseId);
         BlockState connected = javaState;
-        if (javaState != null && javaState.identifier().endsWith("_door")) {
+        if (BlockConnections.needsNeighbours(javaState)) {
+            connected = BlockConnections.connect(javaState, blockPosition, this::getBaseJavaState, BlockConnectionProperties::flags);
+        } else if (javaState != null && javaState.identifier().endsWith("_door")) {
             final int offset = javaState.hasProperty("half", "upper") ? -1 : 1;
             final BlockPosition otherPosition = new BlockPosition(blockPosition.x(), blockPosition.y() + offset, blockPosition.z());
             final int otherId = rewriter.javaId(this.getBlockState(otherPosition));
@@ -268,6 +274,47 @@ public class ChunkTracker extends StoredObject {
             }
         }
         return connected != null ? BedrockProtocol.MAPPINGS.getJavaBlockStates().getOrDefault(connected, baseId) : baseId;
+    }
+
+    private BlockState getBaseJavaState(final BlockPosition position) {
+        final BedrockChunkSection section = this.getChunkSection(position);
+        final int id = section != null ? this.getJavaBlockState(section, position.x() & 15, position.y() & 15, position.z() & 15) : ProtocolConstants.JAVA_AIR_ID;
+        return BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(id);
+    }
+
+    private void refreshNearbyConnections(final BlockPosition position) {
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (Math.abs(dx) + Math.abs(dz) <= 1) {
+                        final BlockPosition candidate = new BlockPosition(position.x() + dx, position.y() + dy, position.z() + dz);
+                        if (BlockConnections.needsNeighbours(this.getBaseJavaState(candidate))) {
+                            this.connectedBlockUpdates.add(candidate);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void refreshBorderConnections(final int chunkX, final int chunkZ) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) != 1) {
+                    continue;
+                }
+                final Set<BlockPosition> positions = this.neighbourDependentBlocks.get(ChunkPosition.chunkKey(chunkX + dx, chunkZ + dz));
+                if (positions == null) {
+                    continue;
+                }
+                for (BlockPosition position : positions) {
+                    if ((dx == -1 && (position.x() & 15) == 15) || (dx == 1 && (position.x() & 15) == 0)
+                            || (dz == -1 && (position.z() & 15) == 15) || (dz == 1 && (position.z() & 15) == 0)) {
+                        this.connectedBlockUpdates.add(position);
+                    }
+                }
+            }
+        }
     }
 
     public int getJavaBlockState(final BedrockChunkSection section, final int sectionX, final int sectionY, final int sectionZ) {
@@ -457,6 +504,13 @@ public class ChunkTracker extends StoredObject {
         final int prevBlockState = palette.idAt(sectionX, sectionY, sectionZ);
         final String prevTag = blockStateRewriter.tag(prevBlockState);
         palette.setIdAt(sectionX, sectionY, sectionZ, blockState);
+        final Set<BlockPosition> dependent = this.neighbourDependentBlocks.computeIfAbsent(ChunkPosition.chunkKey(blockPosition.x() >> 4, blockPosition.z() >> 4), key -> new HashSet<>());
+        if (BlockConnections.needsNeighbours(this.getBaseJavaState(blockPosition))) {
+            dependent.add(blockPosition);
+        } else {
+            dependent.remove(blockPosition);
+        }
+        this.refreshNearbyConnections(blockPosition);
         final String tag = blockStateRewriter.tag(blockState);
 
         int remappedBlockState = this.getJavaBlockState(blockPosition);
@@ -561,6 +615,7 @@ public class ChunkTracker extends StoredObject {
         this.writeLightData(levelChunkWithLight, buildFullLightPacketData(light));
         levelChunkWithLight.send(BedrockProtocol.class);
         this.chunkLight.put(chunkKey, light);
+        this.refreshBorderConnections(chunkX, chunkZ);
         this.lightVersions.merge(chunkKey, 1L, Long::sum);
         // Initial lighting uses this chunk alone. Refresh its borders with any loaded neighbors.
         this.lightDirtyChunks.add(chunkKey);
@@ -896,7 +951,7 @@ public class ChunkTracker extends StoredObject {
 
     public void tick() {
         for (BlockPosition position : this.connectedBlockUpdates) {
-            if (this.getChunkSection(position) != null) {
+            if (this.getChunkSection(position) != null && this.chunkLight.containsKey(ChunkPosition.chunkKey(position.x() >> 4, position.z() >> 4))) {
                 PacketFactory.sendJavaBlockUpdate(this.user(), position, this.getJavaBlockState(position));
             }
         }
@@ -1001,6 +1056,8 @@ public class ChunkTracker extends StoredObject {
     }
 
     private Chunk remapChunk(final BedrockChunk chunk) {
+        final Set<BlockPosition> dependent = new HashSet<>();
+        this.neighbourDependentBlocks.put(ChunkPosition.chunkKey(chunk.getX(), chunk.getZ()), dependent);
         final BlockStateRewriter blockStateRewriter = this.user().get(BlockStateRewriter.class);
         final int airId = this.bedrockAirId();
 
@@ -1024,10 +1081,13 @@ public class ChunkTracker extends StoredObject {
 
                 final String[] paletteIndexBlockStateTags = new String[remappedBlockPalette.size()];
                 final boolean[] paletteIndexDoors = new boolean[remappedBlockPalette.size()];
+                final boolean[] paletteIndexConnected = new boolean[remappedBlockPalette.size()];
                 for (int i = 0; i < remappedBlockPalette.size(); i++) {
                     paletteIndexBlockStateTags[i] = blockStateRewriter.tag(remappedBlockPalette.idByIndex(i));
                     final BlockState state = blockStateRewriter.blockState(remappedBlockPalette.idByIndex(i));
                     paletteIndexDoors[i] = state != null && state.identifier().endsWith("_door");
+                    final int javaId = blockStateRewriter.javaId(remappedBlockPalette.idByIndex(i));
+                    paletteIndexConnected[i] = BlockConnections.needsNeighbours(BedrockProtocol.MAPPINGS.getJavaBlockStates().inverse().get(javaId));
                 }
                 remappedBlockPalette.replaceIds(bedrockBlockState -> {
                     final int javaBlockState = blockStateRewriter.javaId(bedrockBlockState);
@@ -1042,10 +1102,13 @@ public class ChunkTracker extends StoredObject {
                 for (int y = 0; y < 16; y++) {
                     for (int z = 0; z < 16; z++) {
                         for (int x = 0; x < 16; x++) {
-                            final int paletteIndex = remappedBlockPalette.paletteIndexAt(remappedBlockPalette.index(x, y, z));
+                            final int paletteIndex = layer0.paletteIndexAt(layer0.index(x, y, z));
                             final String tag = paletteIndexBlockStateTags[paletteIndex];
-                            if (paletteIndexDoors[paletteIndex]) {
+                            if (paletteIndexDoors[paletteIndex] || paletteIndexConnected[paletteIndex]) {
                                 final BlockPosition doorPosition = new BlockPosition((chunk.getX() << 4) + x, this.minY + (idx << 4) + y, (chunk.getZ() << 4) + z);
+                                if (paletteIndexConnected[paletteIndex]) {
+                                    dependent.add(doorPosition);
+                                }
                                 remappedBlockPalette.setIdAt(x, y, z, this.getJavaBlockState(doorPosition));
                             }
                             if (tag != null) {

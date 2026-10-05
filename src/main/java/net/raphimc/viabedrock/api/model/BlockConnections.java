@@ -21,8 +21,97 @@ import com.viaversion.nbt.tag.CompoundTag;
 import com.viaversion.nbt.tag.NumberTag;
 import com.viaversion.viaversion.api.minecraft.BlockPosition;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.ToIntFunction;
 
 public final class BlockConnections {
+
+    private static final String[] DIRECTIONS = {"north", "east", "south", "west"};
+    private static final int[] DX = {0, 1, 0, -1};
+    private static final int[] DZ = {-1, 0, 1, 0};
+
+    public static boolean needsNeighbours(final BlockState state) {
+        return state != null && (state.identifier().equals("redstone_wire") || vineFamily(state) != null);
+    }
+
+    public static BlockState connect(final BlockState state, final BlockPosition position,
+                                     final Function<BlockPosition, BlockState> neighbour, final ToIntFunction<BlockState> properties) {
+        final String vine = vineFamily(state);
+        if (vine != null) {
+            final int dy = vine.equals("weeping_vines") ? -1 : 1;
+            final BlockState next = neighbour.apply(offset(position, 0, dy, 0));
+            return vine.equals(vineFamily(next)) ? state.withIdentifier(vine + "_plant").withoutProperties("age") : state;
+        }
+        if (state == null || !state.identifier().equals("redstone_wire")) {
+            return state;
+        }
+        final String[] sides = new String[4];
+        final boolean aboveBlocked = (properties.applyAsInt(neighbour.apply(offset(position, 0, 1, 0))) & 1) != 0;
+        for (int i = 0; i < 4; i++) {
+            final BlockPosition sidePosition = offset(position, DX[i], 0, DZ[i]);
+            final BlockState side = neighbour.apply(sidePosition);
+            final int flags = properties.applyAsInt(side);
+            final boolean support = (flags & 4) != 0 || named(side, "hopper")
+                    || (side != null && side.identifier().endsWith("trapdoor"));
+            if (!aboveBlocked && support && wireConnects(neighbour.apply(offset(sidePosition, 0, 1, 0)), -1, properties)) {
+                sides[i] = (flags & (8 << ((i + 2) % 4))) != 0 ? "up" : "side";
+            } else if (wireConnects(side, i, properties)
+                    || ((flags & 1) == 0 && wireConnects(neighbour.apply(offset(sidePosition, 0, -1, 0)), -1, properties))) {
+                sides[i] = "side";
+            } else {
+                sides[i] = "none";
+            }
+        }
+        final boolean northSouth = !sides[0].equals("none") || !sides[2].equals("none");
+        final boolean eastWest = !sides[1].equals("none") || !sides[3].equals("none");
+        if (northSouth || eastWest) {
+            for (int i = 0; i < 4; i++) {
+                if (sides[i].equals("none") && (i % 2 == 0 ? !eastWest : !northSouth)) {
+                    sides[i] = "side";
+                }
+            }
+        }
+        BlockState result = state;
+        for (int i = 0; i < 4; i++) {
+            result = result.withProperty(DIRECTIONS[i], sides[i]);
+        }
+        return result;
+    }
+
+    private static boolean wireConnects(final BlockState state, final int direction, final ToIntFunction<BlockState> properties) {
+        if (named(state, "redstone_wire")) {
+            return true;
+        }
+        if (state == null || direction < 0) {
+            return false;
+        }
+        final String facing = state.properties().get("facing");
+        if (named(state, "repeater")) {
+            return DIRECTIONS[direction].equals(facing) || DIRECTIONS[(direction + 2) % 4].equals(facing);
+        }
+        if (named(state, "observer")) {
+            return DIRECTIONS[direction].equals(facing);
+        }
+        return (properties.applyAsInt(state) & 2) != 0;
+    }
+
+    private static boolean named(final BlockState state, final String name) {
+        return state != null && state.namespace().equals("minecraft") && state.identifier().equals(name);
+    }
+
+    private static String vineFamily(final BlockState state) {
+        if (named(state, "weeping_vines") || named(state, "weeping_vines_plant")) {
+            return "weeping_vines";
+        }
+        if (named(state, "twisting_vines") || named(state, "twisting_vines_plant")) {
+            return "twisting_vines";
+        }
+        return null;
+    }
+
+    private static BlockPosition offset(final BlockPosition position, final int dx, final int dy, final int dz) {
+        return new BlockPosition(position.x() + dx, position.y() + dy, position.z() + dz);
+    }
 
     private static final Set<String> CONTAINER_TAGS = Set.of("chest", "trapped_chest", "barrel", "shulker_box", "ender_chest",
             "workbench", "furnace", "blast_furnace", "smoker", "brewing_stand", "enchanting_table", "stonecutter",
