@@ -38,6 +38,9 @@ public class ExportBlockConnections {
             }
             result.put(BuiltInRegistries.BLOCK.getKey(block).toString(), states.values().stream().distinct().count() == 1 ? states.firstEntry().getValue() : states);
         }
-        Files.writeString(Path.of("block_connection_properties.json"), new GsonBuilder().setPrettyPrinting().create().toJson(result));
+        byte[] json = new GsonBuilder().create().toJson(result).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try (var gzip = new java.util.zip.GZIPOutputStream(Files.newOutputStream(Path.of("block_connection_properties.json.gz")))) {
+            gzip.write(json);
+        }
     }
 }

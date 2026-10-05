@@ -94,6 +94,17 @@ class BlockConnectionsTest {
     }
 
     @Test
+    void hopperAndTrapdoorAllowClimbingWithoutInventingConnections() {
+        this.put(1, 1, 0, "redstone_wire[power=0]");
+        this.put(1, 0, 0, "hopper[enabled=true,facing=down]");
+        assertTrue(this.connect(WIRE).hasProperty("east", "side"));
+        this.put(1, 0, 0, "oak_trapdoor[facing=north,half=bottom,open=true,powered=false,waterlogged=false]");
+        assertTrue(this.connect(WIRE).hasProperty("east", "side"));
+        this.put(1, 1, 0, "lever[face=floor,facing=north,powered=true]");
+        assertTrue(this.connect(WIRE).hasProperty("east", "none"));
+    }
+
+    @Test
     void vineBodyAndTipFollowGrowthAndRemoval() {
         final BlockState weeping = BlockState.fromString("minecraft:weeping_vines[age=17]");
         assertEquals(weeping, this.connect(weeping));

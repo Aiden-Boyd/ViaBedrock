@@ -30,6 +30,10 @@ public final class BlockConnections {
     private static final int[] DX = {0, 1, 0, -1};
     private static final int[] DZ = {-1, 0, 1, 0};
 
+    private static final Set<String> CONTAINER_TAGS = Set.of("chest", "trapped_chest", "barrel", "shulker_box", "ender_chest",
+            "workbench", "furnace", "blast_furnace", "smoker", "brewing_stand", "enchanting_table", "stonecutter",
+            "anvil", "smithing_table", "grindstone", "loom", "cartography_table", "beacon", "dispenser", "dropper", "hopper", "crafter");
+
     public static boolean needsNeighbours(final BlockState state) {
         return state != null && (state.identifier().equals("redstone_wire") || vineFamily(state) != null);
     }
@@ -113,9 +117,7 @@ public final class BlockConnections {
         return new BlockPosition(position.x() + dx, position.y() + dy, position.z() + dz);
     }
 
-    private static final Set<String> CONTAINER_TAGS = Set.of("chest", "trapped_chest", "barrel", "shulker_box", "ender_chest",
-            "workbench", "furnace", "blast_furnace", "smoker", "brewing_stand", "enchanting_table", "stonecutter",
-            "anvil", "smithing_table", "grindstone", "loom", "cartography_table", "beacon", "dispenser", "dropper", "hopper", "crafter");
+
 
     public static boolean isContainerInteraction(final String tag) {
         return tag != null && CONTAINER_TAGS.contains(tag);
