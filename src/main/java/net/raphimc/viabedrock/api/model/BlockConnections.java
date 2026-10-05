@@ -117,8 +117,6 @@ public final class BlockConnections {
         return new BlockPosition(position.x() + dx, position.y() + dy, position.z() + dz);
     }
 
-
-
     public static boolean isContainerInteraction(final String tag) {
         return tag != null && CONTAINER_TAGS.contains(tag);
     }
