@@ -31,7 +31,7 @@ public class ExportBlockConnections {
                     if (state.isFaceSturdy(EmptyBlockGetter.INSTANCE, BlockPos.ZERO, faces[i])) flags |= 4 << i;
                 }
                 var properties = new TreeMap<String, String>();
-                for (var entry : state.getValues().entrySet()) properties.put(entry.getKey().getName(), value(entry.getKey(), entry.getValue()));
+                state.getValues().forEach(entry -> properties.put(entry.property().getName(), value(entry.property(), entry.value())));
                 String name = BuiltInRegistries.BLOCK.getKey(block).toString();
                 if (!properties.isEmpty()) name += "[" + properties.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(java.util.stream.Collectors.joining(",")) + "]";
                 states.put(name, flags);
