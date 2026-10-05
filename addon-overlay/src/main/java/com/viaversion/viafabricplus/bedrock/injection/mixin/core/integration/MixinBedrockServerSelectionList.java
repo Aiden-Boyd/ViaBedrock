@@ -84,7 +84,10 @@ public abstract class MixinBedrockServerSelectionList extends ObjectSelectionLis
                 rows.add(index++, new BedrockFriendEntry(this.screen, (ServerSelectionList) (Object) this, world, Component.empty()));
             }
         }
-        return rows;
+        // Vanilla also uses this collection after replaceEntries to restore selection.
+        entries.clear();
+        entries.addAll(rows);
+        return entries;
     }
 
     @Inject(method = "refreshEntries", at = @At("TAIL"))

@@ -93,14 +93,27 @@ jobs:
         timeout-minutes: 5
         run: python3 ../ViaBedrock/tools/addon/smoke-menu-client.py
 
+      - name: Stage Minecraft runtime logs on smoke failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          target = Path("menu-diagnostics")
+          target.mkdir(exist_ok=True)
+          run = Path("../viafabricplus-bedrock/run")
+          files = [run / "logs/latest.log", *run.glob("crash-reports/*.txt")]
+          for source in files:
+              if source.is_file():
+                  shutil.copy2(source, target / source.name)
+          PY
+
       - name: Preserve Minecraft runtime logs on smoke failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: minecraft-menu-failure
-          path: |
-            ../viafabricplus-bedrock/run/logs/latest.log
-            ../viafabricplus-bedrock/run/crash-reports/*.txt
+          path: menu-diagnostics/
           retention-days: 7
 
       - name: Launch packaged mod without external ViaVersion or ViaFabricPlus
