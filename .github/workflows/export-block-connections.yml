@@ -1,0 +1,37 @@
+name: Export Minecraft block connection properties
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/inventory-current]
+    paths: ['tools/ExportBlockConnections.java', '.github/workflows/export-block-connections.yml']
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Export from official Minecraft 26.3
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, pathlib, concurrent.futures
+          manifest=json.load(urllib.request.urlopen('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'))
+          meta=json.load(urllib.request.urlopen(next(v['url'] for v in manifest['versions'] if v['id']=='26.3')))
+          pathlib.Path('mc-libs').mkdir(exist_ok=True)
+          downloads=[meta['downloads']['client']]+[v['downloads']['artifact'] for v in meta['libraries'] if 'artifact' in v.get('downloads',{})]
+          def download(pair):
+              i,v=pair
+              urllib.request.urlretrieve(v['url'], f'mc-libs/{i}.jar')
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor: list(executor.map(download,enumerate(downloads)))
+          PY
+          javac -cp 'mc-libs/*' tools/ExportBlockConnections.java
+          java -cp 'mc-libs/*:tools' ExportBlockConnections
+      - uses: actions/upload-artifact@v4
+        with:
+          name: block-connection-properties
+          path: block_connection_properties.json
+          retention-days: 7
