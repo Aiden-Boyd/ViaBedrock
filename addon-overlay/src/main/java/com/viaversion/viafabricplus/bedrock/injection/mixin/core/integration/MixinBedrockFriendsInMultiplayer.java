@@ -104,6 +104,9 @@ public abstract class MixinBedrockFriendsInMultiplayer implements BedrockMenuSmo
         if (!(this.serverSelectionList.getSelected() instanceof BedrockFriendEntry selected) || !selected.key().equals("menu-qa")) {
             throw new AssertionError("Refreshing a friend row lost its selection");
         }
+        if (this.serverSelectionList.getFocused() != this.serverSelectionList.getSelected()) {
+            throw new AssertionError("Refreshing a friend row left keyboard focus on a stale entry");
+        }
         final var full = new FriendWorld("menu-qa", "0", "Menu QA", "Menu QA World", "26.3", 8, 8, 0, null);
         ((BedrockServerList) this.serverSelectionList).viaBedrock$friends(java.util.List.of(full), Component.empty());
         if (this.joinButton.active) throw new AssertionError("A full friend world left Join enabled");
